@@ -35,6 +35,8 @@ cd ..\mrstart
 if errorlevel 1 exit /B 1
 cd ..
 
+if defined VCEXP goto nomzcom
+
 cd mzcom
 "%DEVENV%" mzcom.sln /Build "Release|%BUILDMODE%"
 if errorlevel 1 exit /B 1
@@ -49,6 +51,8 @@ cd mzcom
 "%DEVENV%" mzcom.sln /Build "3m|%BUILDMODE%"
 if errorlevel 1 exit /B 1
 cd ..
+
+:nomzcom
 
 copy ..\COPYING-libscheme.txt ..\..\share\
 if errorlevel 1 exit /B 1

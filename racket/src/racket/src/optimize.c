@@ -3014,16 +3014,16 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   fb = b->fbranch;
 
   if (context & OPT_CONTEXT_BOOLEAN) {
-    /* For test position, convert (if <expr> #t #f) to <expr> */
-    if (SAME_OBJ(tb, scheme_true) && SAME_OBJ(fb, scheme_false))
-      return scheme_optimize_expr(t, info, context);
-
     /* Convert (if <id> <id> expr) to (if <id> #t expr) */
     if (SAME_TYPE(SCHEME_TYPE(t), scheme_local_type)
         && SAME_TYPE(SCHEME_TYPE(tb), scheme_local_type)
         && (SCHEME_LOCAL_POS(t) == SCHEME_LOCAL_POS(tb))) {
       b->tbranch = tb = scheme_true;
     }
+  
+    /* For test position, convert (if <expr> #t #f) to <expr> */
+    if (SAME_OBJ(tb, scheme_true) && SAME_OBJ(fb, scheme_false))
+      return scheme_optimize_expr(t, info, context);
   }
 
   t = scheme_optimize_expr(t, info, OPT_CONTEXT_BOOLEAN);

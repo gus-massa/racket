@@ -3120,6 +3120,24 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
       b3->tbranch = tb;
       b3->fbranch = fb;
       t = b2->test;
+      
+      /* Try optimize b3: (if (not x) y z) => (if x z y) */
+      while (1) {
+        if (SAME_TYPE(SCHEME_TYPE(b3->test), scheme_application2_type)) {
+          Scheme_App2_Rec *app_b3;
+
+          app_b3 = (Scheme_App2_Rec *)b3->test;
+          if (SAME_PTR(scheme_not_prim, app_b3->rator)) {
+            b3->test = b3->tbranch;
+            b3->tbranch = b3->fbranch;
+            b3->fbranch = b3->test;
+            b3->test = app_b3->rand;
+          } else
+	          break;
+        } else
+          break;
+      }
+
       tb = (Scheme_Object *)b3;
     }
   }

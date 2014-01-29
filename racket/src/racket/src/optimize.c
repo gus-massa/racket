@@ -3114,6 +3114,7 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
     Scheme_Branch_Rec *b2 = (Scheme_Branch_Rec *)t;
     if (SCHEME_FALSEP(b2->fbranch)) {
       Scheme_Branch_Rec *b3;
+      Scheme_Object *b3_o;
       b3 = MALLOC_ONE_TAGGED(Scheme_Branch_Rec);
       b3->so.type = scheme_branch_type;
       b3->test = b2->tbranch;
@@ -3137,8 +3138,22 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
         } else
           break;
       }
+      
+      b3_o = (Scheme_Object *)b3;
+      
+      if (SCHEME_TYPE(b3->test) > _scheme_compiled_values_types_) {
+        info->size -= 1;
+        if (SCHEME_FALSEP(b3->test))
+          b3_o = b3->fbranch;
+        else
+          b3_o = b3->tbranch;
+      } else if (SAME_TYPE(SCHEME_TYPE(b3->test), scheme_compiled_quote_syntax_type)
+                 || SAME_TYPE(SCHEME_TYPE(b3->test), scheme_compiled_unclosed_procedure_type)) {
+        info->size -= 1; /* could be more precise for better for procedure size */
+        b3_o = b3->tbranch;
+      }
 
-      tb = (Scheme_Object *)b3;
+      tb = b3_o;
     }
   }
 

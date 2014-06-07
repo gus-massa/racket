@@ -6359,6 +6359,13 @@ Scheme_Object *scheme_optimize_expr(Scheme_Object *expr, Optimize_Info *info, in
 	  c = scheme_hash_get((Scheme_Hash_Table *)c, scheme_make_integer(pos));
 
 	  if (c) {
+          if (context & OPT_CONTEXT_BOOLEAN) {
+            Scheme_Object *pred;
+            pred = optimize_get_predicate(pos, info);
+            if (pred)
+             return scheme_true;
+             /* all predicates recognize non-#f things */
+          }
 	    /* We can't inline, but mark the top level as ready and fixed,
 	       so we can avoid null checks in JITed code, etc: */
 	    expr = scheme_toplevel_to_flagged_toplevel(expr, SCHEME_TOPLEVEL_FIXED);

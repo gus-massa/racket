@@ -1265,6 +1265,25 @@
                       (set! x x))))
             #f)
 
+;; Don't copy propagate not-constant top-level:
+(test-comp '(module m racket/base
+              (define x '(10))
+              x)
+           '(module m racket/base
+              (define x '(10))
+              '(10))
+            #f)
+
+;; Copy propagate not-constant top-level
+;; to Boolean context is type is known:
+(test-comp '(module m racket/base
+              (define x '(10))
+              (if x 1 2))
+           '(module m racket/base
+              (define x '(10))
+              1))
+
+
 (test-comp '(let ([x 1][y 2]) x)
 	   '1)
 (test-comp '(let ([x 1][y 2]) (+ y x))

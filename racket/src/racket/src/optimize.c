@@ -3611,7 +3611,7 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   Scheme_Branch_Rec *b;
   Scheme_Object *t, *tb, *fb;
   Scheme_Hash_Tree *old_types;
-  int preserves_marks = 1, single_result = 1, same_then_vclock, init_vclock, init_kclock, then_kclock;
+  int preserves_marks = 1, single_result = 1, init_vclock, then_vclock, init_kclock, then_kclock;
   Optimize_Info_Sequence info_seq;
 
   b = (Scheme_Branch_Rec *)o;
@@ -3714,7 +3714,6 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
 
   optimize_info_seq_step(info, &info_seq);
 
-  info->vclock += 1; /* model branch as clock increment */
   init_vclock = info->vclock;
   init_kclock = info->kclock;
 
@@ -3732,9 +3731,8 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   else if (info->single_result < 0)
     single_result = -1;
 
-  same_then_vclock = (init_vclock == info->vclock);
-
   info->types = old_types;
+  then_vclock = info->vclock;
   then_kclock = info->kclock;
   info->vclock = init_vclock;
   info->kclock = init_kclock;
@@ -3752,16 +3750,12 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   else if (single_result && (info->single_result < 0))
     single_result = -1;
 
+  if (then_vclock > info->vclock)
+    info->vclock = then_vclock;
   if (then_kclock > info->kclock)
     info->kclock = then_kclock;
 
   info->types = old_types; /* could try to take an intersection here ... */
-
-  if (same_then_vclock && (init_vclock == info->vclock)) {
-    /* we can rewind the vclock to just after the test, because the
-       `if` as a whole has no effect */
-    info->vclock--;
-  }
 
   info->preserves_marks = preserves_marks;
   info->single_result = single_result;

@@ -4814,48 +4814,22 @@ scheme_optimize_lets(Scheme_Object *form, Optimize_Info *info, int for_inline, i
 # define pos_EARLIER(a, b) (rev_bind_order ? ((a) > (b)) : ((a) < (b)))
 
   if (context & OPT_CONTEXT_BOOLEAN) {
-    /* Special case: (let ([x M]) (if x x N)), where x is not in N,
-       to (if M #t N), since we're in a test position. */
+    /* Special case: (let ([x M]) (if x x N)),
+       to (let ([x M]) (if x #t N)), since we're in a test position. */
     if (!(SCHEME_LET_FLAGS(head) & SCHEME_LET_RECURSIVE) && (head->count == 1) && (head->num_clauses == 1)) {
       clv = (Scheme_Compiled_Let_Value *)head->body;
-      if (SAME_TYPE(SCHEME_TYPE(clv->body), scheme_branch_type)
-          && (((clv->flags[0] & SCHEME_USE_COUNT_MASK) >> SCHEME_USE_COUNT_SHIFT)
-              == 2)) {
+      if (SAME_TYPE(SCHEME_TYPE(clv->body), scheme_branch_type)) {
         Scheme_Branch_Rec *b = (Scheme_Branch_Rec *)clv->body;
         if (SAME_TYPE(SCHEME_TYPE(b->test), scheme_local_type)
             && SAME_TYPE(SCHEME_TYPE(b->tbranch), scheme_local_type)
             && !SCHEME_LOCAL_POS(b->test)
             && !SCHEME_LOCAL_POS(b->tbranch)) {
-          Scheme_Branch_Rec *b3;
-
-          b3 = MALLOC_ONE_TAGGED(Scheme_Branch_Rec);
-          b3->so.type = scheme_branch_type;
-          b3->test = clv->value;
-          b3->tbranch = scheme_true;
-          if (post_bind) {
-            /* still need a `let' around N: */
-            b3->fbranch = (Scheme_Object *)head;
-            clv->value = scheme_false;
-            clv->flags[0] = 0; /* variable now unused */
-            clv->body = b->fbranch;
-          } else {
-            b3->fbranch = b->fbranch;
-          }
-
-          if (post_bind)
-            sub_info = info;
-          else
-            sub_info = optimize_info_add_frame(info, 1, 0, 0);
-
-          form = scheme_optimize_expr((Scheme_Object *)b3, sub_info, context);
-
-          if (!post_bind) {
-            info->single_result = sub_info->single_result;
-            info->preserves_marks = sub_info->preserves_marks;
-            optimize_info_done(sub_info, NULL);
-          }
-
-          return form;
+          int cnt;
+          
+          cnt = (clv->flags[0] & SCHEME_USE_COUNT_MASK) >> SCHEME_USE_COUNT_SHIFT;
+          clv->flags[0] -= clv->flags[0] & SCHEME_USE_COUNT_MASK;
+          clv->flags[0] |= (cnt - 1) << SCHEME_USE_COUNT_SHIFT;
+          b->tbranch = scheme_true;
         }
       }
     }

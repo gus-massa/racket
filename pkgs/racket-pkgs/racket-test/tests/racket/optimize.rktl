@@ -1366,6 +1366,10 @@
                             (a2))))
 
 (test-comp '(lambda (x) (let ([r (something)])
+                          (if r (something-else) r)))
+           '(lambda (x) (if (something) (something-else) #f)))
+
+(test-comp '(lambda (x) (let ([r (something)])
                           (if r #t (something-else))))
            '(lambda (x) (if (something) #t (something-else))))
 

@@ -4813,6 +4813,26 @@ scheme_optimize_lets(Scheme_Object *form, Optimize_Info *info, int for_inline, i
 
 # define pos_EARLIER(a, b) (rev_bind_order ? ((a) > (b)) : ((a) < (b)))
 
+  /* Special case: (let ([x M]) (if x N x)),
+     to (let ([x M]) (if x N #f)). */
+  if (!(SCHEME_LET_FLAGS(head) & SCHEME_LET_RECURSIVE) && (head->count == 1) && (head->num_clauses == 1)) {
+    clv = (Scheme_Compiled_Let_Value *)head->body;
+    if (SAME_TYPE(SCHEME_TYPE(clv->body), scheme_branch_type)) {
+      Scheme_Branch_Rec *b = (Scheme_Branch_Rec *)clv->body;
+      if (SAME_TYPE(SCHEME_TYPE(b->test), scheme_local_type)
+          && SAME_TYPE(SCHEME_TYPE(b->fbranch), scheme_local_type)
+          && !SCHEME_LOCAL_POS(b->test)
+          && !SCHEME_LOCAL_POS(b->fbranch)) {
+        int cnt;
+        
+        cnt = (clv->flags[0] & SCHEME_USE_COUNT_MASK) >> SCHEME_USE_COUNT_SHIFT;
+        clv->flags[0] -= clv->flags[0] & SCHEME_USE_COUNT_MASK;
+        clv->flags[0] |= (cnt - 1) << SCHEME_USE_COUNT_SHIFT;
+        b->fbranch = scheme_false;
+      }
+    }
+  }
+
   if (context & OPT_CONTEXT_BOOLEAN) {
     /* Special case: (let ([x M]) (if x x N)),
        to (let ([x M]) (if x #t N)), since we're in a test position. */

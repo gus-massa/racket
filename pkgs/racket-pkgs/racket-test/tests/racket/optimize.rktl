@@ -1199,6 +1199,19 @@
                 (list l l))))
 
 (test-comp '(lambda (w z)
+              (let* ([f (lambda () w)]
+                     [g (lambda () z)]
+                     [l (if w f g)])
+                (if (procedure? l)
+                    (list f f g g l l)
+                    2)))
+           '(lambda (w z)
+              (let* ([f (lambda () w)]
+                     [g (lambda () z)]
+                     [l (if w f g)])
+                (list f f g g l l))))
+                    
+(test-comp '(lambda (w z)
               (list (if (pair? w)
                         (car z)
                         (car w))

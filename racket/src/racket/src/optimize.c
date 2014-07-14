@@ -5288,6 +5288,7 @@ scheme_optimize_lets(Scheme_Object *form, Optimize_Info *info, int for_inline, i
 
       if (value && (scheme_compiled_propagate_ok(value, body_info))) {
         int cnt;
+        Scheme_Object *pred;
 
         if (is_rec)
           cnt = 2;
@@ -5295,7 +5296,15 @@ scheme_optimize_lets(Scheme_Object *form, Optimize_Info *info, int for_inline, i
           cnt = ((pre_body->flags[0] & SCHEME_USE_COUNT_MASK) >> SCHEME_USE_COUNT_SHIFT);
 
         optimize_propagate(body_info, pos, value, cnt == 1);
-	did_set_value = 1;
+
+        if (SAME_TYPE(SCHEME_TYPE(value), scheme_local_type)) {
+          pred = NULL;
+        } else
+          pred = expr_implies_predicate(value, rhs_info, 0, 5);
+        if (pred)
+          add_type(body_info, pos, pred);
+
+        did_set_value = 1;
         checked_once = 1;
       } else if (value && !is_rec) {
         int cnt, ct;

@@ -5789,6 +5789,28 @@ optimize_closure_compilation(Scheme_Object *_data, Optimize_Info *info, int cont
   cl->body_psize = info->psize;
   cl->has_nonleaf = info->has_nonleaf;
 
+  if (OPT_ESTIMATE_FUTURE_SIZES) {
+    int nsz;
+    nsz = estimate_expr_size(code, 0, 32);
+    if (nsz <= 128) {
+      /* nsz > 128 means that estimate_expr_size was unsuccesfull */
+      if (nsz < info->size) {
+        /* not useful, because estimate_expr_size is only a lower bound */
+        /* cl->body_size = nsz; */
+        /* printf("[%d,%d]", nsz, info->size); */
+      } else if (nsz > info->size) {
+        /* This is bad */
+        if (info->size < 0) { /* Alternative version: (nsz < 10) */
+          /* This is worse */
+          /* printf("[!!!%d,%d,%s!!!]\n", nsz, info->size, scheme_write_to_string(data->name ? data->name : scheme_false, NULL)); */
+          printf(" estimated: %d\n info:      %d\n function:  %s\n\n", nsz, info->size,
+                 scheme_write_to_string(data->name ? data->name : scheme_false, NULL));
+        }
+      }
+    }
+  }
+
+
   /* closure itself is not an effect */
   info->vclock = init_vclock;
   info->kclock = init_kclock;

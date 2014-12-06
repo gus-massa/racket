@@ -629,6 +629,9 @@ static Scheme_Object *optimize_ignored(Scheme_Object *e, Optimize_Info *info, in
   if (maybe_omittable) {
     if (scheme_omittable_expr(e, expected_vals, 5, 0, info, NULL, 0, id_offset, ID_OMIT))
       return NULL;
+  } else if ((expected_vals == 1) || (expected_vals == -1)) {
+    if (scheme_omittable_expr(e, expected_vals, 5, 0, info, NULL, 0, id_offset, ID_OMIT))
+      return scheme_false;
   }
 
   if (fuel) {

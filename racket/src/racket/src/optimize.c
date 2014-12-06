@@ -627,7 +627,7 @@ static Scheme_Object *optimize_ignored(Scheme_Object *e, Optimize_Info *info, in
    NULL to dincate that it can be omitted. */
 {
   if (scheme_omittable_expr(e, expected_vals, 5, 0, info, NULL, 0, id_offset, ID_OMIT))
-    return maybe_omittable? NULL: scheme_false;
+    return maybe_omittable ? NULL : scheme_false;
 
   if (fuel) {
     /* We could do a lot more here, but for now, we just avoid purely

@@ -2681,7 +2681,8 @@ static Scheme_Object *hash_table_next(const char *name, mzlonglong start, int ar
 
   if (SCHEME_HASHTP(o)) {
     Scheme_Hash_Table *hash;
-    int i, sz;
+    int sz;
+    mzlonglong i;
 
     hash = (Scheme_Hash_Table *)o;
 
@@ -2708,7 +2709,8 @@ static Scheme_Object *hash_table_next(const char *name, mzlonglong start, int ar
   } else if (SCHEME_BUCKTP(o)) {
     Scheme_Bucket_Table *hash;
     Scheme_Bucket *bucket;
-    int i, sz;
+    int sz;
+    mzlonglong i;
 
     hash = (Scheme_Bucket_Table *)o;
 

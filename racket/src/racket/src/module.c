@@ -4733,7 +4733,7 @@ void scheme_check_unsafe_accessible(Scheme_Object *insp, Scheme_Env *from_env)
 
   if (insp && SCHEME_HASHTRP(insp)) {
     Scheme_Hash_Tree *t = (Scheme_Hash_Tree *)insp;
-    int i;
+    mzlonglong i;
     Scheme_Object *k, *v;
 
     for (i = scheme_hash_tree_next(t, -1); i != -1; i = scheme_hash_tree_next(t, i)) {
@@ -7845,14 +7845,15 @@ static void propagate_imports(Module_Begin_Expand_State *bxs,
   Scheme_Hash_Table *ht, *required, *super_required;
   Scheme_Object *phase, *super_name, *name, *super_vec, *vec;
   Scheme_Object *l, *v, *super_defs, *key, *val;
-  int i, j;
+  mzlonglong i;
+  int k, j;
   Scheme_Env *super_def_genv, *def_genv;
 
   ht = super_bxs->tables;
-  for (i = ht->size; i--; ) {
-    if (ht->vals[i]) {
-      phase = ht->keys[i];
-      super_required = (Scheme_Hash_Table *)SCHEME_VEC_ELS(ht->vals[i])[1];
+  for (k = ht->size; k--; ) {
+    if (ht->vals[k]) {
+      phase = ht->keys[k];
+      super_required = (Scheme_Hash_Table *)SCHEME_VEC_ELS(ht->vals[k])[1];
 
       if (SCHEME_TRUEP(phase))
         phase = scheme_bin_plus(phase, phase_shift);

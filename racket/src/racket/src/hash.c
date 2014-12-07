@@ -1561,7 +1561,7 @@ static uintptr_t equal_hash_key(Scheme_Object *o, uintptr_t k, Hash_Info *hi)
     {
       Scheme_Hash_Tree *ht = (Scheme_Hash_Tree *)o;
       Scheme_Object *ik, *iv;
-      int i;
+      mzlonglong i;
       uintptr_t vk;
       intptr_t old_depth;
 
@@ -2047,7 +2047,7 @@ static uintptr_t equal_hash_key2(Scheme_Object *o, Hash_Info *hi)
     {
       Scheme_Hash_Tree *ht = (Scheme_Hash_Tree *)o;
       Scheme_Object *iv, *ik;
-      int i;
+      mzlonglong i;
       uintptr_t k = 0;
       intptr_t old_depth;
       
@@ -2807,7 +2807,7 @@ int scheme_hash_tree_equal_rec(Scheme_Hash_Tree *t1, Scheme_Object *orig_t1,
                                void *eql)
 {
   Scheme_Object *k, *v, *v2;
-  int i;
+  mzlonglong i;
 
   if ((t1->count != t2->count)
       || ((SCHEME_HASHTR_FLAGS(t1) & 0x3) != (SCHEME_HASHTR_FLAGS(t2) & 0x3)))

@@ -9446,7 +9446,6 @@ double scheme_get_inexact_milliseconds(void)
   return (double)now.time * 1000.0 + (double)now.millitm;
 # else
 #  ifdef USE_WIN32_TIME
-  FILETIME ft;
   mzlonglong v;
   v = get_hectonanoseconds_as_longlong();
   return (double)(v / 10000) + (((double)(v % 10000)) / 10000.0);

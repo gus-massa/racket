@@ -593,7 +593,7 @@ intptr_t find_exe_stack_size()
 		    mzlonglong lsz;
 		    if (ReadFile(fd, &lsz, sizeof(mzlonglong), &got, NULL)
 			&& (got == sizeof(mzlonglong))) {
-		      sz = lsz;
+		      sz = (intptr_t)lsz;
 		    }
 		  }
 		}

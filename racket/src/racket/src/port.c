@@ -29,8 +29,14 @@
    is implemented here, since much of the work has to do with
    ports. */
 
+/* Some copilers don't like re-def of GC_malloc in schemef.h: */
+#ifndef MZ_PRECISE_GC
+# define SCHEME_NO_GC_PROTO
+#endif
+
 #include "schpriv.h"
 #include "schmach.h"
+#include "schgc.h"
 #ifdef UNISTD_INCLUDE
 # include <unistd.h>
 #endif

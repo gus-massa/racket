@@ -1353,7 +1353,11 @@
            '(lambda ()
               (let ([y (random)])
                 (begin0 y (set! y 5)))))
-                
+
+(test-comp '(lambda () 7)
+           '(lambda ()
+              (begin0 (lambda () (null? 1 2)) #f) 7))
+
 ; test for unary aplications
 (test-comp -1
            '(- 1))

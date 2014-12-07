@@ -664,6 +664,51 @@ static Scheme_Object *optimize_ignored(Scheme_Object *e, Optimize_Info *info, in
           return make_discarding_app_sequence(app, -1, NULL, info, id_offset);
       }
       break;
+    case scheme_begin0_sequence_type:
+      {
+        Scheme_Sequence *seq = (Scheme_Sequence *)e;
+        Scheme_Object *first, *last;
+        int i, addone, dropone, len;
+        
+        first = seq->array[0];
+        first = optimize_ignored(first, info, id_offset, expected_vals, 1, fuel - 1);
+        dropone = !first;
+        if (first) {
+          seq->array[0] = first;
+        } else if (seq->count == 1) {
+          /* (begin0 <omittable>) ==> #f */
+          return maybe_omittable ? NULL : scheme_false;
+        }
+
+        last = seq->array[seq->count-1];
+        addone = !single_valued_noncm_expression(last, 5);
+
+        len = seq->count - dropone + addone;
+        if (len == 1) {
+          /* (begin0 <omittable> <sv_ncm>) ==> <sv_ncm> 
+             (begin0 <sv_ncm>) ==> <sv_ncm>  */
+          return last;
+        }
+
+        {
+          /* At this point len is at least 2 */
+          Scheme_Sequence *seq2;
+          int j = 0;
+                    
+          seq2 = scheme_malloc_sequence(len);
+          seq2->so.type = scheme_sequence_type;
+          seq2->count = len;
+
+          for (i = dropone; i < seq->count; i++) {
+            seq2->array[j++] = seq->array[i];
+          }
+          if (addone) 
+            seq2->array[j++] = scheme_false;
+
+          return (Scheme_Object *)seq2;
+        }
+      }
+      break;
     }
   }
 

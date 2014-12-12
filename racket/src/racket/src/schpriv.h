@@ -3493,6 +3493,26 @@ void scheme_add_global_constant_symbol(Scheme_Object *name, Scheme_Object *v, Sc
   scheme_add_global_constant(name, p, env); \
 } while(0)
 
+#define GLOBAL_FOLDING_PRIM_OMITTABLE(name, func, a1, a2, a3, env)      do {\
+  Scheme_Object *p; \
+  p = scheme_make_folding_prim(func, name, a1, a2, a3); \
+  SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(SCHEME_PRIM_IS_OMITABLE); \
+  scheme_add_global_constant(name, p, env); \
+} while(0)
+
+#define GLOBAL_PRIM_W_ARITY_OMITTABLE(name, func, a1, a2, env)      do {\
+  Scheme_Object *p; \
+  p = scheme_make_prim_w_arity(func, name, a1, a2); \
+  SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(SCHEME_PRIM_IS_OMITABLE); \
+  scheme_add_global_constant(name, p, env); \
+} while(0)
+
+#define GLOBAL_PRIM_W_ARITY2_OMITTABLE(name, func, a1, a2, a3, a4, env)      do {\
+  Scheme_Object *p; \
+  p = scheme_make_prim_w_arity2(func, name, a1, a2, a3, a4); \
+  SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(SCHEME_PRIM_IS_OMITABLE); \
+  scheme_add_global_constant(name, p, env); \
+} while(0)
 
 Scheme_Object *scheme_tl_id_sym(Scheme_Env *env, Scheme_Object *id, Scheme_Object *bdg, int mode, 
                                 Scheme_Object *phase, int *_skipped);

@@ -519,16 +519,16 @@ void scheme_init_thread(Scheme_Env *env)
   GLOBAL_PRIM_W_ARITY("dump-memory-stats"            , scheme_dump_gc_stats, 0, -1, env);
   GLOBAL_PRIM_W_ARITY("vector-set-performance-stats!", current_stats       , 1, 2, env);
 
-  GLOBAL_PRIM_W_ARITY("make-empty-namespace", scheme_make_namespace, 0, 0, env);
+  GLOBAL_PRIM_W_ARITY_OMITTABLE("make-empty-namespace", scheme_make_namespace, 0, 0, env);
 
   GLOBAL_PRIM_W_ARITY("thread"                , sch_thread         , 1, 1, env);
   GLOBAL_PRIM_W_ARITY("thread/suspend-to-kill", sch_thread_nokill  , 1, 1, env);
   GLOBAL_PRIM_W_ARITY("sleep"                 , sch_sleep          , 0, 1, env);
-  GLOBAL_FOLDING_PRIM("thread?"               , thread_p           , 1, 1, 1, env);
+  GLOBAL_FOLDING_PRIM_OMITTABLE("thread?"     , thread_p           , 1, 1, 1, env);
   GLOBAL_PRIM_W_ARITY("thread-running?"       , thread_running_p   , 1, 1, env);
   GLOBAL_PRIM_W_ARITY("thread-dead?"          , thread_dead_p      , 1, 1, env);
   GLOBAL_PRIM_W_ARITY("thread-wait"           , thread_wait        , 1, 1, env);
-  GLOBAL_PRIM_W_ARITY("current-thread"        , sch_current        , 0, 0, env);
+  GLOBAL_PRIM_W_ARITY_OMITTABLE("current-thread", sch_current      , 0, 0, env);
   GLOBAL_PRIM_W_ARITY("kill-thread"           , kill_thread        , 1, 1, env);
   GLOBAL_PRIM_W_ARITY("break-thread"          , break_thread       , 1, 2, env);
   GLOBAL_PRIM_W_ARITY("thread-suspend"        , thread_suspend     , 1, 1, env);
@@ -546,48 +546,48 @@ void scheme_init_thread(Scheme_Env *env)
 
   GLOBAL_PARAMETER("current-custodian"        , current_custodian    , MZCONFIG_CUSTODIAN, env);
   GLOBAL_PRIM_W_ARITY("make-custodian"        , make_custodian       , 0, 1, env);
-  GLOBAL_FOLDING_PRIM("custodian?"            , custodian_p          , 1, 1, 1  , env);
+  GLOBAL_FOLDING_PRIM_OMITTABLE("custodian?"  , custodian_p          , 1, 1, 1  , env);
   GLOBAL_PRIM_W_ARITY("custodian-shutdown-all", custodian_close_all  , 1, 1, env);
   GLOBAL_PRIM_W_ARITY("custodian-managed-list", custodian_to_list    , 2, 2, env);
   GLOBAL_PRIM_W_ARITY("make-custodian-box"    , make_custodian_box   , 2, 2, env);
   GLOBAL_PRIM_W_ARITY("custodian-box-value"   , custodian_box_value  , 1, 1, env);
-  GLOBAL_FOLDING_PRIM("custodian-box?"        , custodian_box_p      , 1, 1, 1  , env);
+  GLOBAL_FOLDING_PRIM_OMITTABLE("custodian-box?" , custodian_box_p   , 1, 1, 1  , env);
   GLOBAL_PRIM_W_ARITY("call-in-nested-thread" , call_as_nested_thread, 1, 2, env);
 
   GLOBAL_PARAMETER("current-plumber"          , current_plumber      , MZCONFIG_PLUMBER, env);
-  GLOBAL_PRIM_W_ARITY("make-plumber"          , make_plumber       , 0, 0, env);
-  GLOBAL_FOLDING_PRIM("plumber?"              , plumber_p          , 1, 1, 1  , env);
+  GLOBAL_PRIM_W_ARITY_OMITTABLE("make-plumber", make_plumber       , 0, 0, env);
+  GLOBAL_FOLDING_PRIM_OMITTABLE("plumber?"    , plumber_p          , 1, 1, 1  , env);
   GLOBAL_PRIM_W_ARITY("plumber-flush-all"     , plumber_flush_all   , 1, 1, env);
   GLOBAL_PRIM_W_ARITY("plumber-add-flush!"    , plumber_add_flush   , 2, 3, env);
   GLOBAL_PRIM_W_ARITY("plumber-flush-handle-remove!" , plumber_remove_flush, 1, 1, env);
-  GLOBAL_PRIM_W_ARITY("plumber-flush-handle?" , plumber_flush_p     , 1, 1, env);
+  GLOBAL_PRIM_W_ARITY_OMITTABLE("plumber-flush-handle?", plumber_flush_p     , 1, 1, env);
 
   GLOBAL_PARAMETER("current-namespace"      , current_namespace, MZCONFIG_ENV, env);
-  GLOBAL_PRIM_W_ARITY("namespace?"          , namespace_p          , 1, 1, env);
+  GLOBAL_PRIM_W_ARITY_OMITTABLE("namespace?", namespace_p          , 1, 1, env);
 
-  GLOBAL_PRIM_W_ARITY("security-guard?"    , security_guard_p   , 1, 1, env);
+  GLOBAL_PRIM_W_ARITY_OMITTABLE("security-guard?"    , security_guard_p   , 1, 1, env);
   GLOBAL_PRIM_W_ARITY("make-security-guard", make_security_guard, 3, 4, env);
   GLOBAL_PARAMETER("current-security-guard", current_security_guard, MZCONFIG_SECURITY_GUARD, env);
 
-  GLOBAL_PRIM_W_ARITY("thread-group?"    , thread_set_p   , 1, 1, env);
+  GLOBAL_PRIM_W_ARITY_OMITTABLE("thread-group?"    , thread_set_p   , 1, 1, env);
   GLOBAL_PRIM_W_ARITY("make-thread-group", make_thread_set, 0, 1, env);
   GLOBAL_PARAMETER("current-thread-group", current_thread_set, MZCONFIG_THREAD_SET, env);
 
-  GLOBAL_PRIM_W_ARITY("parameter?"            , parameter_p           , 1, 1, env);
+  GLOBAL_PRIM_W_ARITY_OMITTABLE("parameter?"            , parameter_p           , 1, 1, env);
   GLOBAL_PRIM_W_ARITY("make-parameter"        , make_parameter        , 1, 2, env);
   GLOBAL_PRIM_W_ARITY("make-derived-parameter", make_derived_parameter, 3, 3, env);
   GLOBAL_PRIM_W_ARITY("parameter-procedure=?" , parameter_procedure_eq, 2, 2, env);
-  GLOBAL_PRIM_W_ARITY("parameterization?"     , parameterization_p    , 1, 1, env);
+  GLOBAL_PRIM_W_ARITY_OMITTABLE("parameterization?" , parameterization_p , 1, 1, env);
 
-  GLOBAL_PRIM_W_ARITY("thread-cell?"                        , thread_cell_p     , 1, 1, env);
+  GLOBAL_PRIM_W_ARITY_OMITTABLE("thread-cell?"              , thread_cell_p     , 1, 1, env);
   GLOBAL_PRIM_W_ARITY("make-thread-cell"                    , make_thread_cell  , 1, 2, env);
   GLOBAL_PRIM_W_ARITY("thread-cell-ref"                     , thread_cell_get   , 1, 1, env);
   GLOBAL_PRIM_W_ARITY("thread-cell-set!"                    , thread_cell_set   , 2, 2, env);
   GLOBAL_PRIM_W_ARITY("current-preserved-thread-cell-values", thread_cell_values, 0, 1, env);
-  GLOBAL_FOLDING_PRIM("thread-cell-values?"                 , is_thread_cell_values, 1, 1, 1, env);
+  GLOBAL_FOLDING_PRIM_OMITTABLE("thread-cell-values?"       , is_thread_cell_values, 1, 1, 1, env);
 
-  GLOBAL_PRIM_W_ARITY("make-will-executor", make_will_executor, 0, 0, env);
-  GLOBAL_PRIM_W_ARITY("will-executor?"    , will_executor_p   , 1, 1, env);
+  GLOBAL_PRIM_W_ARITY_OMITTABLE("make-will-executor", make_will_executor, 0, 0, env);
+  GLOBAL_PRIM_W_ARITY_OMITTABLE("will-executor?" , will_executor_p , 1, 1, env);
   GLOBAL_PRIM_W_ARITY("will-register"     , register_will     , 3, 3, env);
   GLOBAL_PRIM_W_ARITY("will-try-execute"  , will_executor_try , 1, 1, env);
   GLOBAL_PRIM_W_ARITY("will-execute"      , will_executor_go  , 1, 1, env);
@@ -598,12 +598,12 @@ void scheme_init_thread(Scheme_Env *env)
   GLOBAL_PRIM_W_ARITY("collect-garbage"                       , collect_garbage      , 0, 0, env);
   GLOBAL_PRIM_W_ARITY("current-memory-use"                    , current_memory_use   , 0, 1, env);
 
-  GLOBAL_PRIM_W_ARITY("custodian-require-memory"              , custodian_require_mem, 3, 3, env);
-  GLOBAL_PRIM_W_ARITY("custodian-limit-memory"                , custodian_limit_mem  , 2, 3, env);
-  GLOBAL_PRIM_W_ARITY("custodian-memory-accounting-available?", custodian_can_mem    , 0, 0, env);
+  GLOBAL_PRIM_W_ARITY("custodian-require-memory"                        , custodian_require_mem, 3, 3, env);
+  GLOBAL_PRIM_W_ARITY("custodian-limit-memory"                          , custodian_limit_mem  , 2, 3, env);
+  GLOBAL_PRIM_W_ARITY_OMITTABLE("custodian-memory-accounting-available?", custodian_can_mem    , 0, 0, env);
   
 
-  GLOBAL_FOLDING_PRIM("evt?"                      , evt_p                        , 1, 1 , 1, env);
+  GLOBAL_FOLDING_PRIM_OMITTABLE("evt?"            , evt_p                        , 1, 1 , 1, env);
   GLOBAL_PRIM_W_ARITY2("sync"                     , sch_sync                     , 0, -1, 0, -1, env);
   GLOBAL_PRIM_W_ARITY2("sync/timeout"             , sch_sync_timeout             , 1, -1, 0, -1, env);
   GLOBAL_PRIM_W_ARITY2("sync/enable-break"        , sch_sync_enable_break        , 0, -1, 0, -1, env);
@@ -612,7 +612,7 @@ void scheme_init_thread(Scheme_Env *env)
 
   GLOBAL_PARAMETER("current-thread-initial-stack-size", current_thread_initial_stack_size, MZCONFIG_THREAD_INIT_STACK_SIZE, env);
 
-  GLOBAL_PRIM_W_ARITY("phantom-bytes?", phantom_bytes_p, 1, 1, env);
+  GLOBAL_PRIM_W_ARITY_OMITTABLE("phantom-bytes?", phantom_bytes_p, 1, 1, env);
   GLOBAL_PRIM_W_ARITY("make-phantom-bytes", make_phantom_bytes, 1, 1, env);
   GLOBAL_PRIM_W_ARITY("set-phantom-bytes!", set_phantom_bytes, 2, 2, env);
 }

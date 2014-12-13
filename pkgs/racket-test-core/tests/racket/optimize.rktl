@@ -2722,6 +2722,7 @@
 ;; operations on mutable values:
 (let ()
   (define (check-omit-ok expr [yes? #t])
+    (displayln (list expr 1 '!))
     ;; can omit:
     (test-comp `(module m racket/base
                   (require racket/unsafe/ops)
@@ -2733,6 +2734,7 @@
                     ,expr
                     (f x)))
                yes?)
+    (displayln (list expr 2 '!))
     ;; cannot reorder:
     (test-comp `(module m racket/base
                   (require racket/unsafe/ops)
@@ -2745,7 +2747,9 @@
                   (define (f x)
                     (vector-ref x x)
                     (f x ,expr)))
-               #f))
+               #f)
+     (displayln (list expr 3 '!))
+  )
   (map check-omit-ok
        '((unsafe-vector-ref x x)
          (unsafe-vector*-ref x x)
@@ -3017,7 +3021,49 @@
                 #t
                 (letrec ([z (lambda () z)]) (f z) #f)
                 (letrec ([z (lambda () z)]) (f z) #t))))
-           
+
+;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Check remotion of dead code after error
+(test-comp '(lambda () (random) (error 'error))
+           '(lambda () (random) (error 'error) 5))
+(test-comp '(lambda () (random) (error 'error))
+           '(lambda () (random) (error 'error) (random) 5))
+(test-comp '(lambda () (error 'error))
+           '(lambda () 5 (error 'error) 5))
+(test-comp '(lambda (f) (f) (f) (error 'error))
+           '(lambda (f) (f) (f) (error 'error) (f)))
+
+(test-comp '(lambda (n)
+              (let ([p (begin (error 'error) (fl+ n n))])
+                (if (flonum? p)
+                    (fl+ p p)
+                    'bad)))
+           '(lambda (n)
+              (let ([p (begin (error 'error) (fl- n n))])
+                (if (flonum? p)
+                    (fl+ p p)
+                    'bad))))
+
+(test-comp '(lambda () (if (error 'error) 1 2))
+           '(lambda () (if (error 'error) 1 2) 5))
+(test-comp '(lambda (x) (if x (error 'error) 0) 3)
+           '(lambda (x) (if x (error 'error) 0) 4)
+           #f)
+(test-comp '(lambda (x) (if x 0 (error 'error)) 3)
+           '(lambda (x) (if x 0 (error 'error)) 4)
+           #f)
+
+(test-comp `(module m racket/base
+              (module bad racket/base
+                (error 'error))
+              (random)
+              5)
+           `(module m racket/base
+              (module bad racket/base
+                (error 'error))
+              (random))
+           #f)
+
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Check splitting of definitions
 (test-comp `(module m racket/base

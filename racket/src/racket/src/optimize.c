@@ -64,6 +64,7 @@ struct Optimize_Info
                  taken or doesn't increment the clock) */
   int kclock; /* virtual clock that ticks for a potential continuation capture */
   int sclock; /* virtual clock that ticks when space consumption is potentially observed */
+  int escapes; /* flag to signal that it allways escapes */
   int psize;
   short inline_fuel, shift_fuel;
   char letrec_not_twice, enforce_const, use_psize, has_nonleaf;
@@ -2209,6 +2210,15 @@ static int is_nonsaving_primitive(Scheme_Object *rator, int n)
   return 0;
 }
 
+static int is_allways_escaping_primitive(Scheme_Object *rator)
+{
+  if (SCHEME_PRIMP(rator)
+      && (SCHEME_PRIM_PROC_OPT_FLAGS(rator) & SCHEME_PRIM_ALWAYS_ESCAPES)) {
+        return 1;
+  }
+  return 0;
+}
+
 #define IS_NAMED_PRIM(p, nm) (!strcmp(((Scheme_Primitive_Proc *)p)->name, nm))
 
 static int wants_local_type_arguments(Scheme_Object *rator, int argpos)
@@ -2672,6 +2682,10 @@ static Scheme_Object *finish_optimize_any_application(Scheme_Object *app, Scheme
 
   if (SAME_OBJ(rator, scheme_void_proc))
     return make_discarding_sequence(app, scheme_void, info, 0);
+  
+  if (is_allways_escaping_primitive(rator)) {
+    info->escapes = 1;
+  }
 
   return app;
 }
@@ -3606,7 +3620,7 @@ static Scheme_Object *optimize_sequence(Scheme_Object *o, Optimize_Info *info, i
   Optimize_Info_Sequence info_seq;
 
   optimize_info_seq_init(info, &info_seq);
-
+  
   count = s->count;
   for (i = 0; i < count; i++) {
     prev_size = info->size;
@@ -3616,21 +3630,35 @@ static Scheme_Object *optimize_sequence(Scheme_Object *o, Optimize_Info *info, i
                               ((i + 1 == count)
                                ? scheme_optimize_tail_context(context)
                                : 0));
-    if (i == s->count - 1) {
+
+    if (i + 1 == count) {
       single_result = info->single_result;
       preserves_marks = info->preserves_marks;
-    }
-
-    /* Inlining and constant propagation can expose omittable expressions. */
-    if (i + 1 != count)
-      le = optimize_ignored(le, info, 0, -1, 1, 5);
-
-    if (!le) {
-      drop++;
-      info->size = prev_size;
-      s->array[i] = NULL;
-    } else {
       s->array[i] = le;
+    } else {
+      if (!info->escapes) {
+        /* Inlining and constant propagation can expose omittable expressions. */
+        le = optimize_ignored(le, info, 0, -1, 1, 5);
+        if (!le) {
+          drop++;
+          info->size = prev_size;
+          s->array[i] = NULL;
+        } else {
+          s->array[i] = le;
+        }
+      } else {
+        int j;
+        
+        single_result = info->single_result;
+        preserves_marks = info->preserves_marks;
+        /* Move to last position in case the begin form is droped */
+        s->array[count - 1] = le;
+        for (j = i; j < count - 1; j++) {
+          drop++;
+          s->array[j] = NULL;
+        }
+        break;
+      }
     }
   }
 
@@ -3789,6 +3817,7 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   Scheme_Branch_Rec *b;
   Scheme_Object *t, *tb, *fb;
   Scheme_Hash_Tree *old_types;
+  int old_escapes;
   int preserves_marks = 1, single_result = 1, init_vclock, init_kclock, init_sclock;
   int same_then_vclock, then_kclock, then_sclock;
   Optimize_Info_Sequence info_seq;
@@ -3897,6 +3926,7 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   init_kclock = info->kclock;
   init_sclock = info->sclock;
 
+  old_escapes = info->escapes;
   old_types = info->types;
   add_types(t, info, 5);
 
@@ -3914,6 +3944,7 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   same_then_vclock = (init_vclock == info->vclock);
 
   info->types = old_types;
+  info->escapes = old_escapes;
   then_kclock = info->kclock;
   then_sclock = info->sclock;
   info->vclock = init_vclock;
@@ -3939,6 +3970,7 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
     info->sclock = then_sclock;
 
   info->types = old_types; /* could try to take an intersection here ... */
+  info->escapes = old_escapes; /* ignore errors in then and else branches */
 
   if (same_then_vclock && (init_vclock == info->vclock)) {
     /* we can rewind the vclock to just after the test, because the
@@ -6021,6 +6053,7 @@ optimize_closure_compilation(Scheme_Object *_data, Optimize_Info *info, int cont
   info->vclock = init_vclock;
   info->kclock = init_kclock;
   info->sclock = init_sclock;
+  info->escapes = 0;
 
   info->size++;
 
@@ -6884,6 +6917,8 @@ module_optimize(Scheme_Object *data, Optimize_Info *info, int context)
 
   optimize_info_seq_done(info, &info_seq);
 
+  info->escapes = 0;
+
   return data;
 }
 
@@ -6929,6 +6964,7 @@ Scheme_Object *scheme_optimize_expr(Scheme_Object *expr, Optimize_Info *info, in
 
   info->preserves_marks = 1;
   info->single_result = 1;
+  info->escapes = 0;
 
   switch (type) {
   case scheme_local_type:
@@ -8140,6 +8176,7 @@ static Optimize_Info *optimize_info_add_frame(Optimize_Info *info, int orig, int
   naya->vclock = info->vclock;
   naya->kclock = info->kclock;
   naya->sclock = info->sclock;
+  naya->escapes = info->escapes;
   naya->init_kclock = info->kclock;
   naya->use_psize = info->use_psize;
   naya->logger = info->logger;
@@ -8174,6 +8211,7 @@ static void optimize_info_done(Optimize_Info *info, Optimize_Info *parent)
   parent->vclock = info->vclock;
   parent->kclock = info->kclock;
   parent->sclock = info->sclock;
+  parent->escapes = info->escapes;
   parent->psize += info->psize;
   parent->shift_fuel = info->shift_fuel;
   if (info->has_nonleaf)

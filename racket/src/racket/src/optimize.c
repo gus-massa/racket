@@ -3613,12 +3613,11 @@ static Scheme_Object *optimize_sequence(Scheme_Object *o, Optimize_Info *info, i
 {
   Scheme_Sequence *s = (Scheme_Sequence *)o;
   Scheme_Object *le;
-  int i, j, count, prev_size, old_escapes;
+  int i, j, count, prev_size;
   int drop = 0, preserves_marks = 0, single_result = 0;
   Optimize_Info_Sequence info_seq;
 
   optimize_info_seq_init(info, &info_seq);
-  old_escapes = info->escapes;
   info->escapes = 0;
   
   count = s->count;
@@ -3664,7 +3663,6 @@ static Scheme_Object *optimize_sequence(Scheme_Object *o, Optimize_Info *info, i
 
   info->preserves_marks = preserves_marks;
   info->single_result = single_result;
-  info->escapes |= old_escapes;
 
   if (drop + 1 == s->count) {
     return s->array[drop];
@@ -5959,7 +5957,7 @@ optimize_closure_compilation(Scheme_Object *_data, Optimize_Info *info, int cont
   Scheme_Object *code, *ctx;
   Closure_Info *cl;
   mzshort dcs, *dcm;
-  int i, cnt, init_vclock, init_kclock, init_sclock, init_escapes;
+  int i, cnt, init_vclock, init_kclock, init_sclock;
   Scheme_Once_Used *first_once_used = NULL, *last_once_used = NULL;
 
   data = (Scheme_Closure_Data *)_data;
@@ -5973,7 +5971,6 @@ optimize_closure_compilation(Scheme_Object *_data, Optimize_Info *info, int cont
   init_vclock = info->vclock;
   init_kclock = info->kclock;
   init_sclock = info->sclock;
-  init_escapes = info->escapes;
 
   info->vclock += 1; /* model delayed evaluation as vclock increment */
   info->kclock += 1;
@@ -6053,7 +6050,7 @@ optimize_closure_compilation(Scheme_Object *_data, Optimize_Info *info, int cont
   info->vclock = init_vclock;
   info->kclock = init_kclock;
   info->sclock = init_sclock;
-  info->escapes = init_escapes;
+  info->escapes = 0;
 
   info->size++;
 
@@ -6965,6 +6962,7 @@ Scheme_Object *scheme_optimize_expr(Scheme_Object *expr, Optimize_Info *info, in
 
   info->preserves_marks = 1;
   info->single_result = 1;
+  info->escapes = 0;
 
   switch (type) {
   case scheme_local_type:

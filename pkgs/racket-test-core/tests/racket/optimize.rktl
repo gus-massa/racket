@@ -3016,12 +3016,6 @@
 (test-comp '(lambda (f) (f) (f) (error 'error))
            '(lambda (f) (f) (f) (error 'error) (f)))
 
-(test-comp '(lambda () (let ([f (error 'error)]) (list f f)))
-           '(lambda () (let ([f (error 'error)]) (list f f)) 5))
-(test-comp '(lambda () (let ([f (lambda () (error 'error))]) (list f f)) 3)
-           '(lambda () (let ([f (lambda () (error 'error))]) (list f f)) 4)
-           #f)
-
 (test-comp '(lambda (n)
               (let ([p (begin (error 'error) (fl+ n n))])
                 (if (flonum? p)

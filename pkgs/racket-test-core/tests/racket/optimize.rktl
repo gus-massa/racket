@@ -3033,6 +3033,13 @@
 (test-comp '(lambda (f) (f) (f) (error 'error))
            '(lambda (f) (f) (f) (error 'error) (f)))
 
+(test-comp '(lambda (f) (begin0 (f) (random) (error 'error)))
+           '(lambda (f) (begin0 (f) (random) (error 'error) (random) (f))))
+(test-comp '(lambda (f) (error 'error))
+           '(lambda (f) (begin0 (error 'error) (random) (f))))
+(test-comp '(lambda (f) (error 'error))
+           '(lambda (f) (begin0 7 (error 'error) (random) (f))))
+
 (test-comp '(lambda (n)
               (let ([p (begin (error 'error) (fl+ n n))])
                 (if (flonum? p)

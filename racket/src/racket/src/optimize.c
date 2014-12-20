@@ -4430,22 +4430,69 @@ begin0_optimize(Scheme_Object *obj, Optimize_Info *info, int context)
       preserves_marks = info->preserves_marks;
       kclock = info->kclock;
       sclock = info->sclock;
+      s->array[0] = le;
+    } else {
+      /* Inlining and constant propagation can expose omittable expressions: */
+      le = optimize_ignored(le, info, 0, -1, 1, 5);
+      if (!le) {
+        drop++;
+        info->size = prev_size;
+        s->array[i] = NULL;
+      } else {
+        s->array[i] = le;
+      }
     }
 
-    /* Inlining and constant propagation can expose omittable expressions: */
-    if (i)
-      le = optimize_ignored(le, info, 0, -1, 1, 5);
-
-    if (!le) {
-      drop++;
-      info->size = prev_size;
-      s->array[i] = NULL;
-    } else {
-      s->array[i] = le;
+    if (info->escapes) {
+      int j;
+      single_result = info->single_result;
+      preserves_marks = info->preserves_marks;
+      for (j = i + 1; j < count; j++) {
+        drop++;
+        s->array[j] = NULL;
+      }
+      break;
     }
   }
 
   optimize_info_seq_done(info, &info_seq);
+
+  if (info->escapes) {
+    /* In case of an error, optimize (begin0 ... <error> ...) => (begin ... <error>) */
+    Scheme_Sequence *s2;
+    int j = 0;
+
+    info->single_result = 1;
+    info->preserves_marks = 1;
+
+    if (i != 0) {
+      /* We will ignore the first expresion too */
+      le = optimize_ignored(s->array[0], info, 0, -1, 1, 5);
+      if (!le) {
+        drop++;
+        info->size = prev_size;
+        s->array[0] = NULL;
+      } else {
+        s->array[0] = le;
+      }
+    }
+
+    if ((count - drop) == 1) {
+      /* If it's only one expression we can drop the begin0 */
+      return s->array[i];
+    }
+
+    s2 = scheme_malloc_sequence(count - drop);
+    s2->so.type = scheme_sequence_type;
+    s2->count = count - drop;
+
+    for (i = 0; i < count; i++) {
+      if (s->array[i]) {
+        s2->array[j++] = s->array[i];
+      }
+    }
+    return (Scheme_Object *)s2;
+  }
 
   info->preserves_marks = 1;
   info->single_result = single_result;
@@ -4486,7 +4533,8 @@ begin0_optimize(Scheme_Object *obj, Optimize_Info *info, int context)
           s2->array[j++] = s->array[i];
         }
       }
-      s2->array[j++] = expr;
+      if (!info->escapes)
+        s2->array[j++] = expr;
 
       expr = (Scheme_Object *)s2;
     }

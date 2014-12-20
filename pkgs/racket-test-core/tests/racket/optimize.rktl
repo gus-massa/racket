@@ -3053,12 +3053,32 @@
 
 (test-comp '(lambda () (if (error 'error) 1 2))
            '(lambda () (if (error 'error) 1 2) 5))
+(test-comp '(lambda () (error 'error))
+           '(lambda () (if (error 'error) 1 2) 5))
 (test-comp '(lambda (x) (if x (error 'error) 0) 3)
            '(lambda (x) (if x (error 'error) 0) 4)
            #f)
 (test-comp '(lambda (x) (if x 0 (error 'error)) 3)
            '(lambda (x) (if x 0 (error 'error)) 4)
            #f)
+(test-comp '(lambda (x) (if x (error 'error 1) (error 'error 2)))
+           '(lambda (x) (if x (error 'error 1) (error 'error 2)) 5))
+
+(test-comp '(lambda (x) (if x (error 'error) (car x)) (unsafe-car x))
+           '(lambda (x) (if x (error 'error) (car x)) (car x)))
+(test-comp '(lambda (x) (if x (car x) (error 'error)) (unsafe-car x))
+           '(lambda (x) (if x (car x) (error 'error)) (car x)))
+(test-comp '(lambda (x) (if x (begin (car x) (error 'error)) 0) (unsafe-car x))
+           '(lambda (x) (if x (begin (car x) (error 'error)) 0) (car x))
+           #f)
+(test-comp '(lambda (x) (if x 0 (begin (car x) (error 'error))) (unsafe-car x))
+           '(lambda (x) (if x 0 (begin (car x) (error 'error))) (car x))
+           #f)
+
+(test-comp '(lambda (x) (if (car x) (error 'error) 0) (unsafe-car x))
+           '(lambda (x) (if (car x) (error 'error) 0) (car x)))
+(test-comp '(lambda (x) (if (car x) 0 (error 'error)) (unsafe-car x))
+           '(lambda (x) (if (car x) 0 (error 'error)) (car x)))
 
 (test-comp `(module m racket/base
               (module bad racket/base

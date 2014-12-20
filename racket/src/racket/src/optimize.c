@@ -3812,14 +3812,26 @@ static void add_types(Scheme_Object *t, Optimize_Info *info, int fuel)
   }
 }
 
+static int or_tentative(int x, int y)
+{
+  if (x && y) {
+    if ((x < 0) || (y < 0))
+      return -1;
+    else
+      return 1;
+  } else {
+    return 0;
+  }
+}
+
 static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int context)
 {
   Scheme_Branch_Rec *b;
   Scheme_Object *t, *tb, *fb;
-  Scheme_Hash_Tree *old_types;
-  int old_escapes;
-  int preserves_marks = 1, single_result = 1, init_vclock, init_kclock, init_sclock;
-  int same_then_vclock, then_kclock, then_sclock;
+  Scheme_Hash_Tree *init_types, *then_types;
+  int init_vclock, init_kclock, init_sclock;
+  int then_escapes, then_preserves_marks, then_single_result;
+  int then_vclock, then_kclock, then_sclock;
   Optimize_Info_Sequence info_seq;
 
   b = (Scheme_Branch_Rec *)o;
@@ -3851,6 +3863,11 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   optimize_info_seq_init(info, &info_seq);
 
   t = scheme_optimize_expr(t, info, OPT_CONTEXT_BOOLEAN | OPT_CONTEXT_SINGLED);
+
+  if (info->escapes) {
+    optimize_info_seq_done(info, &info_seq);
+    return t;
+  }
 
   /* Try to lift out `let`s and `begin`s around a test: */
   {
@@ -3922,31 +3939,25 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   optimize_info_seq_step(info, &info_seq);
 
   info->vclock += 1; /* model branch as clock increment */
+
   init_vclock = info->vclock;
   init_kclock = info->kclock;
   init_sclock = info->sclock;
+  init_types = info->types;
 
-  old_escapes = info->escapes;
-  old_types = info->types;
   add_types(t, info, 5);
 
   tb = scheme_optimize_expr(tb, info, scheme_optimize_tail_context(context));
 
-  if (!info->preserves_marks)
-    preserves_marks = 0;
-  else if (info->preserves_marks < 0)
-    preserves_marks = -1;
-  if (!info->single_result)
-    single_result = 0;
-  else if (info->single_result < 0)
-    single_result = -1;
-
-  same_then_vclock = (init_vclock == info->vclock);
-
-  info->types = old_types;
-  info->escapes = old_escapes;
+  then_types = info->types;
+  then_preserves_marks = info->preserves_marks;
+  then_single_result = info->single_result;
+  then_escapes = info->escapes;
+  then_vclock = info->vclock;
   then_kclock = info->kclock;
   then_sclock = info->sclock;
+
+  info->types = init_types;
   info->vclock = init_vclock;
   info->kclock = init_kclock;
   info->sclock = init_sclock;
@@ -3955,31 +3966,41 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
 
   fb = scheme_optimize_expr(fb, info, scheme_optimize_tail_context(context));
 
-  if (!info->preserves_marks)
-    preserves_marks = 0;
-  else if (preserves_marks && (info->preserves_marks < 0))
-    preserves_marks = -1;
-  if (!info->single_result)
-    single_result = 0;
-  else if (single_result && (info->single_result < 0))
-    single_result = -1;
+  if (info->escapes && then_escapes) {
+    /* both branches escaped */
+    info->preserves_marks = 1;
+    info->single_result = 1;
+    info->kclock = init_kclock;
+    info->types = init_types; /* not sure if this is necesary */
 
-  if (then_kclock > info->kclock)
+  } else if (info->escapes) {
+    info->preserves_marks = then_preserves_marks;
+    info->single_result = then_single_result;
     info->kclock = then_kclock;
+    info->types = then_types;
+    info->escapes = 0;
+
+  } else if (then_escapes) {
+    info->escapes = 0;
+
+  } else {
+    then_preserves_marks = or_tentative(then_preserves_marks, info->preserves_marks);
+    info->preserves_marks = then_preserves_marks;
+    then_single_result = or_tentative(then_single_result, info->single_result);
+    info->single_result = then_single_result;
+    if (then_kclock > info->kclock)
+      info->kclock = then_kclock;
+    info->types = init_types; /* could try to take an intersection here ... */
+  }
+
   if (then_sclock > info->sclock)
     info->sclock = then_sclock;
 
-  info->types = old_types; /* could try to take an intersection here ... */
-  info->escapes = old_escapes; /* ignore errors in then and else branches */
-
-  if (same_then_vclock && (init_vclock == info->vclock)) {
+  if ((init_vclock == then_vclock) && (init_vclock == info->vclock)) {
     /* we can rewind the vclock to just after the test, because the
        `if` as a whole has no effect */
     info->vclock--;
   }
-
-  info->preserves_marks = preserves_marks;
-  info->single_result = single_result;
 
   optimize_info_seq_done(info, &info_seq);
 

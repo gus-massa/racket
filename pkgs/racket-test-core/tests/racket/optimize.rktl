@@ -3080,6 +3080,11 @@
 (test-comp '(lambda (x) (if (car x) 0 (error 'error)) (unsafe-car x))
            '(lambda (x) (if (car x) 0 (error 'error)) (car x)))
 
+(test-comp '(lambda (f) (error 'error))
+           '(lambda (f) (with-continuation-mark (error 'error) 'v (f))))
+(test-comp '(lambda (f) (values (f)) (error 'error))
+           '(lambda (f) (with-continuation-mark (f) (error 'error) (f))))
+
 (test-comp `(module m racket/base
               (module bad racket/base
                 (error 'error))

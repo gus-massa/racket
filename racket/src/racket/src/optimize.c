@@ -4076,9 +4076,20 @@ static Scheme_Object *optimize_wcm(Scheme_Object *o, Optimize_Info *info, int co
 
   k = scheme_optimize_expr(wcm->key, info, OPT_CONTEXT_SINGLED);
 
+  if (info->escapes) {
+    optimize_info_seq_done(info, &info_seq);
+    return k;
+  }
+
   optimize_info_seq_step(info, &info_seq);
 
   v = scheme_optimize_expr(wcm->val, info, OPT_CONTEXT_SINGLED);
+
+  if (info->escapes) {
+    optimize_info_seq_done(info, &info_seq);
+    info->size += 1;
+    return make_discarding_first_sequence(k, v, info, 0);
+  }
 
   /* The presence of a key can be detected by other expressions,
      to increment vclock to prevent expressions incorrectly

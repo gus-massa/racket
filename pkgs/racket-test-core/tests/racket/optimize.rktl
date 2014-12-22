@@ -3085,6 +3085,24 @@
 (test-comp '(lambda (f) (values (f)) (error 'error))
            '(lambda (f) (with-continuation-mark (f) (error 'error) (f))))
 
+(test-comp '(lambda (f x) (f x x) (set! x 3) (error 'error))
+           '(lambda (f x) (f x x) (set! x 3) (set! x (error 'error)) 5))
+(test-comp '(lambda (f x) (error 'error))
+           '(lambda (f x) (set! x (error 'error)) 5))
+(test-comp '(lambda (f) (let ([x (random)]) (f x x) (set! x 3) (error 'error)))
+           '(lambda (f) (let ([x (random)]) (f x x) (set! x 3) (set! x (error 'error)) 5)))
+(test-comp '(lambda (f) (let ([x (random)]) (error 'error)))
+           '(lambda (f) (let ([x (random)]) (set! x (error 'error)) 5)))
+
+(test-comp `(module m racket/base
+              (define x 5)
+              (set! x 3)
+              (error 'error))
+           `(module m racket/base
+              (define x 5)
+              (set! x 3)
+              (set! x (error 'error))))
+
 (test-comp `(module m racket/base
               (module bad racket/base
                 (error 'error))

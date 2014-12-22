@@ -4154,6 +4154,9 @@ set_optimize(Scheme_Object *data, Optimize_Info *info, int context)
 
   val = scheme_optimize_expr(val, info, OPT_CONTEXT_SINGLED);
 
+  if (info->escapes)
+      return val;
+
   info->preserves_marks = 1;
   info->single_result = 1;
 

@@ -3225,10 +3225,12 @@ static Scheme_Object *optimize_application3(Scheme_Object *o, Optimize_Info *inf
 
   /* Check for (apply ... (list ...)) early: */
   le = direct_apply((Scheme_Object *)app, app->rator, app->rand2, info);
-  if (le) return scheme_optimize_expr(le, info, context);
+  if (le)
+    return scheme_optimize_expr(le, info, context);
 
   le = check_app_let_rator(o, app->rator, info, 2, context);
-  if (le) return le;
+  if (le) 
+    return le;
 
   le = optimize_for_inline(info, app->rator, 2, NULL, NULL, app, &rator_flags, context, 0);
   if (le)
@@ -3240,6 +3242,10 @@ static Scheme_Object *optimize_application3(Scheme_Object *o, Optimize_Info *inf
 
   le = scheme_optimize_expr(app->rator, info, sub_context);
   app->rator = le;
+  if (info->escapes) {
+    optimize_info_seq_done(info, &info_seq);
+    return app->rator;
+  }
 
   {
     /* Maybe found "((lambda" after optimizing; try again */
@@ -3258,6 +3264,10 @@ static Scheme_Object *optimize_application3(Scheme_Object *o, Optimize_Info *inf
 
   le = scheme_optimize_expr(app->rand1, info, sub_context);
   app->rand1 = le;
+  if (info->escapes) {
+    info->size += 1;
+    return make_discarding_first_sequence(app->rator, app->rand1, info, 0);
+  }
 
   /* 2nd arg */
 
@@ -3271,8 +3281,14 @@ static Scheme_Object *optimize_application3(Scheme_Object *o, Optimize_Info *inf
 
   le = scheme_optimize_expr(app->rand2, info, sub_context);
   app->rand2 = le;
-
   optimize_info_seq_done(info, &info_seq);
+  if (info->escapes) {
+    info->size += 1;
+    return make_discarding_first_sequence(app->rator,
+                                          make_discarding_first_sequence(app->rand1, app->rand2,
+                                                                         info, 0),
+                                             info, 0);
+  }
 
   /* Check for (apply ... (list ...)) after some optimizations: */
   le = direct_apply((Scheme_Object *)app, app->rator, app->rand2, info);

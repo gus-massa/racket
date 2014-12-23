@@ -3107,6 +3107,22 @@
            '(lambda () (not (error 'error)) 5))
 (test-comp '(lambda (f) (values (f)) (error 'error))
            '(lambda (f) ((f) (error 'error)) 5))
+           
+(test-comp '(lambda () (error 'error))
+           '(lambda () ((error 'error) 0 1) 5))
+(test-comp '(lambda () (error 'error))
+           '(lambda () (cons (error 'error) 1) 5))
+(test-comp '(lambda () (error 'error))
+           '(lambda () (cons 0 (error 'error)) 5))
+(test-comp '(lambda (f) (f) (error 'error))
+           '(lambda (f) (f) (cons (error 'error) (f)) 5))
+(test-comp '(lambda (f) (values (f)) (error 'error))
+           '(lambda (f) (cons (f) (error 'error)) 5))
+(test-comp '(lambda (f) (values (f)) (error 'error))
+           '(lambda (f) ((f) (error 'error) (f)) 5))
+(test-comp '(lambda (f g) (values (f)) (values (g)) (error 'error))
+           '(lambda (f g) ((f) (g) (error 'error)) 5))
+
 
 (test-comp `(module m racket/base
               (define x 5)

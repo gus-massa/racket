@@ -2909,7 +2909,8 @@ static Scheme_Object *optimize_application2(Scheme_Object *o, Optimize_Info *inf
   app = (Scheme_App2_Rec *)o;
 
   le = check_app_let_rator(o, app->rator, info, 1, context);
-  if (le) return le;
+  if (le)
+    return le;
 
   le = optimize_for_inline(info, app->rator, 1, NULL, app, NULL, &rator_flags, context, 0);
   if (le)
@@ -2921,6 +2922,10 @@ static Scheme_Object *optimize_application2(Scheme_Object *o, Optimize_Info *inf
 
   le = scheme_optimize_expr(app->rator, info, sub_context);
   app->rator = le;
+  if (info->escapes) {
+    optimize_info_seq_done(info, &info_seq);
+    return app->rator;
+  }
 
   {
     /* Maybe found "((lambda" after optimizing; try again */
@@ -2941,8 +2946,11 @@ static Scheme_Object *optimize_application2(Scheme_Object *o, Optimize_Info *inf
 
   le = scheme_optimize_expr(app->rand, info, sub_context);
   app->rand = le;
-
   optimize_info_seq_done(info, &info_seq);
+  if (info->escapes) {
+    info->size += 1;
+    return make_discarding_first_sequence(app->rator, app->rand, info, 0);
+  }
 
   return finish_optimize_application2(app, info, context, rator_flags);
 }

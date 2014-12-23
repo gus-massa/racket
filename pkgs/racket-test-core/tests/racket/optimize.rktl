@@ -3099,6 +3099,15 @@
 #;(test-comp '(lambda (g) (g) (error 'error))
            '(lambda (g) (call-with-values (g) (error 'error))))
 
+(test-comp '(lambda () (error 'error))
+           '(lambda () ((error 'error) 0) 5))
+(test-comp '(lambda () (error 'error))
+           '(lambda () (car (error 'error)) 5))
+(test-comp '(lambda () (error 'error))
+           '(lambda () (not (error 'error)) 5))
+(test-comp '(lambda (f) (values (f)) (error 'error))
+           '(lambda (f) ((f) (error 'error)) 5))
+
 (test-comp `(module m racket/base
               (define x 5)
               (set! x 3)

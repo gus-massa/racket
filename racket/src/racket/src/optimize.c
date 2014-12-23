@@ -4293,11 +4293,20 @@ apply_values_optimize(Scheme_Object *data, Optimize_Info *info, int context)
 
   f = scheme_optimize_expr(f, info, OPT_CONTEXT_SINGLED);
 
+  if (info->escapes) {
+    optimize_info_seq_done(info, &info_seq);
+    return f;
+  }
   optimize_info_seq_step(info, &info_seq);
 
   e = scheme_optimize_expr(e, info, 0);
 
   optimize_info_seq_done(info, &info_seq);
+
+  if (info->escapes) {
+    info->size += 1;
+    return make_discarding_first_sequence(f, e, info, 0);
+  }
 
   info->size += 1;
   info->vclock += 1;

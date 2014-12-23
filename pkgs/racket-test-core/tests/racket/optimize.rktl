@@ -3094,6 +3094,11 @@
 (test-comp '(lambda (f) (let ([x (random)]) (error 'error)))
            '(lambda (f) (let ([x (random)]) (set! x (error 'error)) 5)))
 
+#;(test-comp '(lambda (f) (error 'error))
+           '(lambda (f) (call-with-values (error 'error) (f))))
+#;(test-comp '(lambda (g) (g) (error 'error))
+           '(lambda (g) (call-with-values (g) (error 'error))))
+
 (test-comp `(module m racket/base
               (define x 5)
               (set! x 3)

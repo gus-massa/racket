@@ -3123,6 +3123,14 @@
 (test-comp '(lambda (f g) (values (f)) (values (g)) (error 'error))
            '(lambda (f g) ((f) (g) (error 'error)) 5))
 
+(test-comp '(lambda (f) (error 'error))
+           '(lambda (f) ((error 'error) (f) (f) (f)) 5))
+(test-comp '(lambda (f) (values (f)) (error 'error))
+           '(lambda (f) ((f) (error 'error) (f) (f)) 5))
+(test-comp '(lambda (f) (values (f)) (values (f)) (error 'error))
+           '(lambda (f) ((f) (f) (error 'error) (f)) 5))
+(test-comp '(lambda (f) (values (f)) (values (f)) (values (f)) (error 'error))
+           '(lambda (f) ((f) (f) (f) (error 'error)) 5))
 
 (test-comp `(module m racket/base
               (define x 5)

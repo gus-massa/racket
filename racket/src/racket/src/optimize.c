@@ -2580,10 +2580,12 @@ static Scheme_Object *optimize_application(Scheme_Object *o, Optimize_Info *info
 
   /* Check for (apply ... (list ...)) early: */
   le = direct_apply((Scheme_Object *)app, app->args[0], app->args[app->num_args], info);
-  if (le) return scheme_optimize_expr(le, info, context);
+  if (le)
+    return scheme_optimize_expr(le, info, context);
 
   le = check_app_let_rator(o, app->args[0], info, app->num_args, context);
-  if (le) return le;
+  if (le)
+    return le;
 
   n = app->num_args + 1;
 
@@ -2593,7 +2595,7 @@ static Scheme_Object *optimize_application(Scheme_Object *o, Optimize_Info *info
     if (!i) {
       le = optimize_for_inline(info, app->args[i], n - 1, app, NULL, NULL, &rator_flags, context, 0);
       if (le)
-	return le;
+        return le;
     }
 
     sub_context = OPT_CONTEXT_SINGLED;
@@ -2607,6 +2609,25 @@ static Scheme_Object *optimize_application(Scheme_Object *o, Optimize_Info *info
     optimize_info_seq_step(info, &info_seq);
     le = scheme_optimize_expr(app->args[i], info, sub_context);
     app->args[i] = le;
+    if (info->escapes) {
+      int j;
+      Scheme_Object *e, *l;
+      optimize_info_seq_done(info, &info_seq);
+
+      l = scheme_make_pair(app->args[i], scheme_null);
+
+      for (j = i - 1; j >= 0; j--) {
+        e = app->args[j];
+        e = optimize_ignored(e, info, 0, 1, 1, 5);
+        if (e) {
+          if (!single_valued_noncm_expression(e, 5))
+            e = ensure_single_value(e);
+          l = scheme_make_pair(e, l);
+        }
+      }
+      return scheme_make_sequence_compilation(l, 1);
+    }
+
 
     if (!i) {
       /* Maybe found "((lambda" after optimizing; try again */

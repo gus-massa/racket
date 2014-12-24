@@ -64,7 +64,6 @@ struct Optimize_Info
                  taken or doesn't increment the clock) */
   int kclock; /* virtual clock that ticks for a potential continuation capture */
   int sclock; /* virtual clock that ticks when space consumption is potentially observed */
-  int escapes; /* flag to signal that it allways escapes */
   int psize;
   short inline_fuel, shift_fuel;
   char letrec_not_twice, enforce_const, use_psize, has_nonleaf;
@@ -72,6 +71,9 @@ struct Optimize_Info
 
   /* Set by expression optimization: */
   int single_result, preserves_marks; /* negative means "tentative", due to fixpoint in progress */
+  int escapes; /* flag to signal that the expression allways escapes. When escapes is 1, it's assumed
+                  that single_result and preserves_marks are also 1, and that it's not necesary to
+                  use optimize_ignored before including the expression. */
 
   char **stat_dists; /* (pos, depth) => used? */
   int *sd_depths;

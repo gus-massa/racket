@@ -3195,6 +3195,15 @@
               (set! f 0))
            #f)
 
+(test-comp '(lambda (f x) (f) (car x x))
+           '(lambda (f x) (f) (car x x) (f)))
+(test-comp '(lambda (f x) (let* ([y (car x x)] [z #f]) #f))
+           '(lambda (f x) (let* ([y (car x x)] [z (car y)]) (f y y z z)) 5))
+
+; test indiretly that single_result and preserves_marks are 1 
+(test-comp '(lambda (x) (quotient/remainder x x x))
+           '(lambda (x) (if (quotient/remainder x x x) 1 2)))
+
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Check splitting of definitions
 (test-comp `(module m racket/base

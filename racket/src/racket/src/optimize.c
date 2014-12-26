@@ -2708,6 +2708,21 @@ static Scheme_Object *finish_optimize_any_application(Scheme_Object *app, Scheme
   
   if (is_allways_escaping_primitive(rator)) {
     info->escapes = 1;
+  } else {
+    Scheme_Object *proc;
+    int rator_flags;
+
+    /* proc = optimize_for_inline(info, rator, argc, NULL, NULL, NULL, &rator_flags, context, 1); */
+    proc = rator;
+    if (proc && SCHEME_PROCP(proc)) {
+      Scheme_Object *a[1];
+      a[0] = proc;
+      if (!scheme_check_proc_arity(NULL, argc, 0, 1, a))  {
+        info->preserves_marks = 1;
+        info->single_result = 1;
+        info->escapes = 1;
+      }
+    }
   }
 
   return app;

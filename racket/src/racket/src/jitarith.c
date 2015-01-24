@@ -888,29 +888,41 @@ static int generate_float_point_arith(mz_jit_state *jitter, Scheme_Object *rator
           } else
 #endif           
             {
-            if (IS_NAMED_PRIM(rator, "flsin"))
+            if (IS_NAMED_PRIM(rator, "flsin")
+                || IS_NAMED_PRIM(rator, "unsafe-flsin"))
               f = call_sin;
-            else if (IS_NAMED_PRIM(rator, "flcos"))
+            else if (IS_NAMED_PRIM(rator, "flcos")
+                     || IS_NAMED_PRIM(rator, "unsafe-flcos"))
               f = call_cos;
-            else if (IS_NAMED_PRIM(rator, "fltan"))
+            else if (IS_NAMED_PRIM(rator, "fltan")
+                     || IS_NAMED_PRIM(rator, "unsafe-fltan"))
               f = call_tan;
-            else if (IS_NAMED_PRIM(rator, "flasin"))
+            else if (IS_NAMED_PRIM(rator, "flasin")
+                     || IS_NAMED_PRIM(rator, "unsafe-flasin"))
               f = call_asin;
-            else if (IS_NAMED_PRIM(rator, "flacos"))
+            else if (IS_NAMED_PRIM(rator, "flacos")
+                     || IS_NAMED_PRIM(rator, "unsafe-flacos"))
               f = call_acos;
-            else if (IS_NAMED_PRIM(rator, "flatan"))
+            else if (IS_NAMED_PRIM(rator, "flatan")
+                     || IS_NAMED_PRIM(rator, "unsafe-flatan"))
               f = call_atan;
-            else if (IS_NAMED_PRIM(rator, "flexp"))
+            else if (IS_NAMED_PRIM(rator, "flexp")
+                     || IS_NAMED_PRIM(rator, "unsafe-flexp"))
               f = call_exp;
-            else if (IS_NAMED_PRIM(rator, "fllog"))
+            else if (IS_NAMED_PRIM(rator, "fllog")
+                     || IS_NAMED_PRIM(rator, "unsafe-fllog"))
               f = call_log;
-            else if (IS_NAMED_PRIM(rator, "flfloor"))
+            else if (IS_NAMED_PRIM(rator, "flfloor")
+                     || IS_NAMED_PRIM(rator, "unsafe-flfloor"))
               f = call_floor;
-            else if (IS_NAMED_PRIM(rator, "flceiling"))
+            else if (IS_NAMED_PRIM(rator, "flceiling")
+                     || IS_NAMED_PRIM(rator, "unsafe-flceiling"))
               f = call_ceiling;
-            else if (IS_NAMED_PRIM(rator, "fltruncate"))
+            else if (IS_NAMED_PRIM(rator, "fltruncate")
+                     || IS_NAMED_PRIM(rator, "unsafe-fltruncate"))
               f = call_truncate;
-            else if (IS_NAMED_PRIM(rator, "flround"))
+            else if (IS_NAMED_PRIM(rator, "flround")
+                     || IS_NAMED_PRIM(rator, "unsafe-flround"))
               f = call_round;
             else {
               scheme_signal_error("internal error: unknown flonum function");

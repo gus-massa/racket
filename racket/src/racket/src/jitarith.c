@@ -77,6 +77,19 @@ static int is_inline_unboxable_op(Scheme_Object *obj, int flag, int unsafely, in
     if (IS_NAMED_PRIM(obj, "unsafe-flimag-part")) return 1;
     if (IS_NAMED_PRIM(obj, "unsafe-flreal-part")) return 1;
 
+    if (IS_NAMED_PRIM(obj, "unsafe-flfloor")) return 1;
+    if (IS_NAMED_PRIM(obj, "unsafe-flceiling")) return 1;
+    if (IS_NAMED_PRIM(obj, "unsafe-fltruncate")) return 1;
+    if (IS_NAMED_PRIM(obj, "unsafe-flround")) return 1;
+    if (IS_NAMED_PRIM(obj, "unsafe-flsin")) return 1;
+    if (IS_NAMED_PRIM(obj, "unsafe-flcos")) return 1;
+    if (IS_NAMED_PRIM(obj, "unsafe-fltan")) return 1;
+    if (IS_NAMED_PRIM(obj, "unsafe-flasin")) return 1;
+    if (IS_NAMED_PRIM(obj, "unsafe-flacos")) return 1;
+    if (IS_NAMED_PRIM(obj, "unsafe-flatan")) return 1;
+    if (IS_NAMED_PRIM(obj, "unsafe-fllog")) return 1;
+    if (IS_NAMED_PRIM(obj, "unsafe-flexp")) return 1;
+
     if (unsafely) {
       /* These are inline-unboxable when their args are
          safely inline-unboxable: */

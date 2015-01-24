@@ -252,13 +252,16 @@ static Scheme_Object *make_string (int argc, Scheme_Object *argv[]);
 static Scheme_Object *string (int argc, Scheme_Object *argv[]);
 static Scheme_Object *string_p (int argc, Scheme_Object *argv[]);
 static Scheme_Object *string_length (int argc, Scheme_Object *argv[]);
+static Scheme_Object *string_eq_new (int argc, Scheme_Object *argv[]);
 static Scheme_Object *string_eq (int argc, Scheme_Object *argv[]);
 static Scheme_Object *string_locale_eq (int argc, Scheme_Object *argv[]);
 static Scheme_Object *string_ci_eq (int argc, Scheme_Object *argv[]);
 static Scheme_Object *string_locale_ci_eq (int argc, Scheme_Object *argv[]);
 static Scheme_Object *string_lt (int argc, Scheme_Object *argv[]);
+static Scheme_Object *string_lt_new (int argc, Scheme_Object *argv[]);
 static Scheme_Object *string_locale_lt (int argc, Scheme_Object *argv[]);
 static Scheme_Object *string_gt (int argc, Scheme_Object *argv[]);
+static Scheme_Object *string_gt_new (int argc, Scheme_Object *argv[]);
 static Scheme_Object *string_locale_gt (int argc, Scheme_Object *argv[]);
 static Scheme_Object *string_lt_eq (int argc, Scheme_Object *argv[]);
 static Scheme_Object *string_gt_eq (int argc, Scheme_Object *argv[]);
@@ -351,6 +354,7 @@ static Scheme_Object *path_lt (int argc, Scheme_Object *argv[]);
 static void register_traversers(void);
 #endif
 
+static int mz_char_strcmp_new(const char *who, const mzchar *str1, intptr_t l1, const mzchar *str2, intptr_t l2, int locale, int size_shortcut);
 static int mz_char_strcmp(const char *who, const mzchar *str1, intptr_t l1, const mzchar *str2, intptr_t l2, int locale, int size_shortcut);
 static int mz_char_strcmp_ci(const char *who, const mzchar *str1, intptr_t l1, const mzchar *str2, intptr_t l2, int locale, int size_shortcut);
 static int mz_strcmp(const char *who, unsigned char *str1, intptr_t l1, unsigned char *str2, intptr_t l2);
@@ -509,6 +513,11 @@ scheme_init_string (Scheme_Env *env)
   SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(SCHEME_PRIM_IS_NARY_INLINED);
   scheme_add_global_constant("string-set!", p, env);
 
+  scheme_add_global_constant("string=?/new",
+			     scheme_make_immed_prim(string_eq_new,
+						    "string=?/new",
+						    2, -1),
+			     env);
   scheme_add_global_constant("string=?",
 			     scheme_make_immed_prim(string_eq,
 						    "string=?",
@@ -529,6 +538,11 @@ scheme_init_string (Scheme_Env *env)
 						    "string-locale-ci=?",
 						    2, -1),
 			     env);
+  scheme_add_global_constant("string<?/new",
+			     scheme_make_immed_prim(string_lt_new,
+						    "string<?/new",
+						    2, -1),
+			     env);
   scheme_add_global_constant("string<?",
 			     scheme_make_immed_prim(string_lt,
 						    "string<?",
@@ -542,6 +556,11 @@ scheme_init_string (Scheme_Env *env)
   scheme_add_global_constant("string>?",
 			     scheme_make_immed_prim(string_gt,
 						    "string>?",
+						    2, -1),
+			     env);
+  scheme_add_global_constant("string>?/new",
+			     scheme_make_immed_prim(string_gt_new,
+						    "string>?/new",
 						    2, -1),
 			     env);
   scheme_add_global_constant("string-locale>?",
@@ -1180,6 +1199,10 @@ static Scheme_Object * name (int argc, Scheme_Object *argv[]) \
   } \
   return falz ? scheme_false : scheme_true; \
 }
+
+GEN_STRING_COMP(string_eq_new, "string=?/new", mz_char_strcmp_new, ==, 0, 1)
+GEN_STRING_COMP(string_lt_new, "string<?/new", mz_char_strcmp_new, <, 0, 0)
+GEN_STRING_COMP(string_gt_new, "string>?/new", mz_char_strcmp_new, >, 0, 0)
 
 GEN_STRING_COMP(string_eq, "string=?", mz_char_strcmp, ==, 0, 1)
 GEN_STRING_COMP(string_lt, "string<?", mz_char_strcmp, <, 0, 0)
@@ -4591,8 +4614,47 @@ intptr_t scheme_char_strlen(const mzchar *s)
   return i;
 }
 
+static int mz_char_strcmp_new(const char *who, const mzchar *str1, intptr_t l1, const mzchar *str2, intptr_t l2, 
+                              int use_locale, int size_shortcut)
+{
+  intptr_t endres = -1, lm = l1;
+
+  if (l1 > l2) {
+    lm = l2;
+    endres = 1;
+  } else if (l2 = l1) {
+    if (size_shortcut) {
+      return 1;
+    } else {
+      endres = 0;
+    }
+  }
+
+#ifndef DONT_USE_LOCALE
+  if (use_locale) {
+    reset_locale();
+    if (locale_on) {
+      return do_locale_comp(who, str1, l1, str2, l2, 0);
+    }
+  }
+#endif
+
+  while (lm--) {
+    unsigned int a, b;
+
+    a = *(str1++);
+    b = *(str2++);
+
+    a = a - b;
+    if (a)
+      return a;
+  }
+
+  return endres;
+}
+
 static int mz_char_strcmp(const char *who, const mzchar *str1, intptr_t l1, const mzchar *str2, intptr_t l2, 
-			  int use_locale, int size_shortcut)
+                          int use_locale, int size_shortcut)
 {
   intptr_t endres;
 

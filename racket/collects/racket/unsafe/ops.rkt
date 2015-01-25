@@ -10,12 +10,7 @@
                      prop:chaperone-unsafe-undefined
                      chaperone-struct-unsafe-undefined)
          (prefix-out unsafe-
-                     (combine-out flsin flcos fltan
-                                  flasin flacos flatan
-                                  fltruncate flround flfloor flceiling
-                                  flexp fllog flexpt
-
-                                  extflsin extflcos extfltan
+                     (combine-out extflsin extflcos extfltan
                                   extflasin extflacos extflatan
                                   extfltruncate extflround extflfloor extflceiling
                                   extflexp extfllog extflexpt)))

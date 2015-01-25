@@ -1362,6 +1362,149 @@ void scheme_init_unsafe_number(Scheme_Env *env)
                                                             | SCHEME_PRIM_PRODUCES_FIXNUM);
   scheme_add_global_constant("unsafe-fl->fx", p, env);
 
+  p = scheme_make_folding_prim(unsafe_fl_truncate, "unsafe-fltruncate", 1, 1, 1);
+  if (scheme_can_inline_fp_op())
+    flags = SCHEME_PRIM_IS_UNARY_INLINED;
+  else
+    flags = SCHEME_PRIM_SOMETIMES_INLINED;
+  SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(flags
+                                                            | SCHEME_PRIM_IS_UNSAFE_FUNCTIONAL
+                                                            | SCHEME_PRIM_WANTS_FLONUM_FIRST
+                                                            | SCHEME_PRIM_PRODUCES_FLONUM);
+  scheme_add_global_constant("unsafe-fltruncate", p, env);
+
+  p = scheme_make_folding_prim(unsafe_fl_round, "unsafe-flround", 1, 1, 1);
+  if (scheme_can_inline_fp_op())
+    flags = SCHEME_PRIM_IS_UNARY_INLINED;
+  else
+    flags = SCHEME_PRIM_SOMETIMES_INLINED;
+  SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(flags
+                                                            | SCHEME_PRIM_IS_UNSAFE_FUNCTIONAL
+                                                            | SCHEME_PRIM_WANTS_FLONUM_FIRST
+                                                            | SCHEME_PRIM_PRODUCES_FLONUM);
+  scheme_add_global_constant("unsafe-flround", p, env);
+
+  p = scheme_make_folding_prim(unsafe_fl_ceiling, "unsafe-flceiling", 1, 1, 1);
+  if (scheme_can_inline_fp_op())
+    flags = SCHEME_PRIM_IS_UNARY_INLINED;
+  else
+    flags = SCHEME_PRIM_SOMETIMES_INLINED;
+  SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(flags
+                                                            | SCHEME_PRIM_IS_UNSAFE_FUNCTIONAL
+                                                            | SCHEME_PRIM_WANTS_FLONUM_FIRST
+                                                            | SCHEME_PRIM_PRODUCES_FLONUM);
+  scheme_add_global_constant("unsafe-flceiling", p, env);
+
+  p = scheme_make_folding_prim(unsafe_fl_floor, "unsafe-flfloor", 1, 1, 1);
+  if (scheme_can_inline_fp_op())
+    flags = SCHEME_PRIM_IS_UNARY_INLINED;
+  else
+    flags = SCHEME_PRIM_SOMETIMES_INLINED;
+  SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(flags
+                                                            | SCHEME_PRIM_IS_UNSAFE_FUNCTIONAL
+                                                            | SCHEME_PRIM_WANTS_FLONUM_FIRST
+                                                            | SCHEME_PRIM_PRODUCES_FLONUM);
+  scheme_add_global_constant("unsafe-flfloor", p, env);
+
+  p = scheme_make_folding_prim(unsafe_fl_sin, "unsafe-flsin", 1, 1, 1);
+  if (scheme_can_inline_fp_op())
+    flags = SCHEME_PRIM_IS_UNARY_INLINED;
+  else
+    flags = SCHEME_PRIM_SOMETIMES_INLINED;
+  SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(flags
+                                                            | SCHEME_PRIM_IS_UNSAFE_FUNCTIONAL
+                                                            | SCHEME_PRIM_WANTS_FLONUM_FIRST
+                                                            | SCHEME_PRIM_PRODUCES_FLONUM);
+  scheme_add_global_constant("unsafe-flsin", p, env);
+
+  p = scheme_make_folding_prim(unsafe_fl_cos, "unsafe-flcos", 1, 1, 1);
+  if (scheme_can_inline_fp_op())
+    flags = SCHEME_PRIM_IS_UNARY_INLINED;
+  else
+    flags = SCHEME_PRIM_SOMETIMES_INLINED;
+  SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(flags
+                                                            | SCHEME_PRIM_IS_UNSAFE_FUNCTIONAL
+                                                            | SCHEME_PRIM_WANTS_FLONUM_FIRST
+                                                            | SCHEME_PRIM_PRODUCES_FLONUM);
+  scheme_add_global_constant("unsafe-flcos", p, env);
+
+  p = scheme_make_folding_prim(unsafe_fl_tan, "unsafe-fltan", 1, 1, 1);
+  if (scheme_can_inline_fp_op())
+    flags = SCHEME_PRIM_IS_UNARY_INLINED;
+  else
+    flags = SCHEME_PRIM_SOMETIMES_INLINED;
+  SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(flags
+                                                            | SCHEME_PRIM_IS_UNSAFE_FUNCTIONAL
+                                                            | SCHEME_PRIM_WANTS_FLONUM_FIRST
+                                                            | SCHEME_PRIM_PRODUCES_FLONUM);
+  scheme_add_global_constant("unsafe-fltan", p, env);
+
+  p = scheme_make_folding_prim(unsafe_fl_asin, "unsafe-flasin", 1, 1, 1);
+  if (scheme_can_inline_fp_op())
+    flags = SCHEME_PRIM_IS_UNARY_INLINED;
+  else
+    flags = SCHEME_PRIM_SOMETIMES_INLINED;
+  SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(flags
+                                                            | SCHEME_PRIM_IS_UNSAFE_FUNCTIONAL
+                                                            | SCHEME_PRIM_WANTS_FLONUM_FIRST
+                                                            | SCHEME_PRIM_PRODUCES_FLONUM);
+  scheme_add_global_constant("unsafe-flasin", p, env);
+
+  p = scheme_make_folding_prim(unsafe_fl_acos, "unsafe-flacos", 1, 1, 1);
+  if (scheme_can_inline_fp_op())
+    flags = SCHEME_PRIM_IS_UNARY_INLINED;
+  else
+    flags = SCHEME_PRIM_SOMETIMES_INLINED;
+  SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(flags
+                                                            | SCHEME_PRIM_IS_UNSAFE_FUNCTIONAL
+                                                            | SCHEME_PRIM_WANTS_FLONUM_FIRST
+                                                            | SCHEME_PRIM_PRODUCES_FLONUM);
+  scheme_add_global_constant("unsafe-flacos", p, env);
+
+  p = scheme_make_folding_prim(unsafe_fl_atan, "unsafe-flatan", 1, 1, 1);
+  if (scheme_can_inline_fp_op())
+    flags = SCHEME_PRIM_IS_UNARY_INLINED;
+  else
+    flags = SCHEME_PRIM_SOMETIMES_INLINED;
+  SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(flags
+                                                            | SCHEME_PRIM_IS_UNSAFE_FUNCTIONAL
+                                                            | SCHEME_PRIM_WANTS_FLONUM_FIRST
+                                                            | SCHEME_PRIM_PRODUCES_FLONUM);
+  scheme_add_global_constant("unsafe-flatan", p, env);
+
+  p = scheme_make_folding_prim(unsafe_fl_log, "unsafe-fllog", 1, 1, 1);
+  if (scheme_can_inline_fp_op())
+    flags = SCHEME_PRIM_IS_UNARY_INLINED;
+  else
+    flags = SCHEME_PRIM_SOMETIMES_INLINED;
+  SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(flags
+                                                            | SCHEME_PRIM_IS_UNSAFE_FUNCTIONAL
+                                                            | SCHEME_PRIM_WANTS_FLONUM_FIRST
+                                                            | SCHEME_PRIM_PRODUCES_FLONUM);
+  scheme_add_global_constant("unsafe-fllog", p, env);
+
+  p = scheme_make_folding_prim(unsafe_fl_exp, "unsafe-flexp", 1, 1, 1);
+  if (scheme_can_inline_fp_op())
+    flags = SCHEME_PRIM_IS_UNARY_INLINED;
+  else
+    flags = SCHEME_PRIM_SOMETIMES_INLINED;
+  SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(flags
+                                                            | SCHEME_PRIM_IS_UNSAFE_FUNCTIONAL
+                                                            | SCHEME_PRIM_WANTS_FLONUM_FIRST
+                                                            | SCHEME_PRIM_PRODUCES_FLONUM);
+  scheme_add_global_constant("unsafe-flexp", p, env);
+
+  p = scheme_make_folding_prim(unsafe_fl_expt, "unsafe-flexpt", 2, 2, 1);
+  if (scheme_can_inline_fp_op())
+    flags = SCHEME_PRIM_IS_BINARY_INLINED;
+  else
+    flags = SCHEME_PRIM_SOMETIMES_INLINED;
+  SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(flags
+                                                            | SCHEME_PRIM_IS_UNSAFE_FUNCTIONAL
+                                                            | SCHEME_PRIM_WANTS_FLONUM_BOTH
+                                                            | SCHEME_PRIM_PRODUCES_FLONUM);
+  scheme_add_global_constant("unsafe-flexpt", p, env);
+
   p = scheme_make_immed_prim(fl_ref, "unsafe-f64vector-ref",
                              2, 2);
   if (scheme_can_inline_fp_op())

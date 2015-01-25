@@ -152,6 +152,20 @@ static Scheme_Object *fl_exp (int argc, Scheme_Object *argv[]);
 static Scheme_Object *fl_log (int argc, Scheme_Object *argv[]);
 static Scheme_Object *fl_expt (int argc, Scheme_Object *argv[]);
 
+static Scheme_Object *unsafe_fl_floor (int argc, Scheme_Object *argv[]);
+static Scheme_Object *unsafe_fl_ceiling (int argc, Scheme_Object *argv[]);
+static Scheme_Object *unsafe_fl_truncate (int argc, Scheme_Object *argv[]);
+static Scheme_Object *unsafe_fl_round (int argc, Scheme_Object *argv[]);
+static Scheme_Object *unsafe_fl_sin (int argc, Scheme_Object *argv[]);
+static Scheme_Object *unsafe_fl_cos (int argc, Scheme_Object *argv[]);
+static Scheme_Object *unsafe_fl_tan (int argc, Scheme_Object *argv[]);
+static Scheme_Object *unsafe_fl_asin (int argc, Scheme_Object *argv[]);
+static Scheme_Object *unsafe_fl_acos (int argc, Scheme_Object *argv[]);
+static Scheme_Object *unsafe_fl_atan (int argc, Scheme_Object *argv[]);
+static Scheme_Object *unsafe_fl_exp (int argc, Scheme_Object *argv[]);
+static Scheme_Object *unsafe_fl_log (int argc, Scheme_Object *argv[]);
+static Scheme_Object *unsafe_fl_expt (int argc, Scheme_Object *argv[]);
+
 static Scheme_Object *integer_to_extfl (int argc, Scheme_Object *argv[]);
 static Scheme_Object *extfl_to_integer (int argc, Scheme_Object *argv[]);
 
@@ -5081,39 +5095,53 @@ static Scheme_Object *fl_to_fx (int argc, Scheme_Object *argv[])
   return NULL;
 }
 
-#define SAFE_FL(op) \
+#define SAFE_UNSAFE_FL(op) \
   static Scheme_Object * fl_ ## op (int argc, Scheme_Object *argv[])    \
   {                                                                     \
     double v;                                                           \
     if (!SCHEME_DBLP(argv[0])) scheme_wrong_contract("fl" #op, "flonum?", 0, argc, argv); \
-    v = scheme_double_ ## op (SCHEME_DBL_VAL(argv[0]));                  \
-    return scheme_make_double(v);                                        \
+    v = scheme_double_ ## op (SCHEME_DBL_VAL(argv[0]));                 \
+    return scheme_make_double(v);                                       \
+  }                                                                     \
+  static Scheme_Object * unsafe_fl_ ## op (int argc, Scheme_Object *argv[])     \
+  {                                                                             \
+    double v;                                                                   \
+    if (scheme_current_thread->constant_folding) return fl_ ## op (argc, argv); \
+    v = scheme_double_ ## op (SCHEME_DBL_VAL(argv[0]));                         \
+    return scheme_make_double(v);                                               \
   }
 
-SAFE_FL(floor)
-SAFE_FL(ceiling)
-SAFE_FL(truncate)
-SAFE_FL(round)
-SAFE_FL(sin)
-SAFE_FL(cos)
-SAFE_FL(tan)
-SAFE_FL(asin)
-SAFE_FL(acos)
-SAFE_FL(atan)
-SAFE_FL(exp)
-SAFE_FL(log)
+SAFE_UNSAFE_FL(floor)
+SAFE_UNSAFE_FL(ceiling)
+SAFE_UNSAFE_FL(truncate)
+SAFE_UNSAFE_FL(round)
+SAFE_UNSAFE_FL(sin)
+SAFE_UNSAFE_FL(cos)
+SAFE_UNSAFE_FL(tan)
+SAFE_UNSAFE_FL(asin)
+SAFE_UNSAFE_FL(acos)
+SAFE_UNSAFE_FL(atan)
+SAFE_UNSAFE_FL(exp)
+SAFE_UNSAFE_FL(log)
 
-#define SAFE_BIN_FL(op) \
+#define SAFE_UNSAFE_BIN_FL(op) \
   static Scheme_Object * fl_ ## op (int argc, Scheme_Object *argv[])    \
   {                                                                     \
     double v;                                                           \
     if (!SCHEME_DBLP(argv[0])) scheme_wrong_contract("fl" #op, "flonum?", 0, argc, argv); \
     if (!SCHEME_DBLP(argv[1])) scheme_wrong_contract("fl" #op, "flonum?", 1, argc, argv); \
-    v = scheme_double_ ## op (SCHEME_DBL_VAL(argv[0]), SCHEME_DBL_VAL(argv[1]));     \
-    return scheme_make_double(v);                                        \
+    v = scheme_double_ ## op (SCHEME_DBL_VAL(argv[0]), SCHEME_DBL_VAL(argv[1]));          \
+    return scheme_make_double(v);                                       \
+  }                                                                     \
+  static Scheme_Object * unsafe_fl_ ## op (int argc, Scheme_Object *argv[])      \
+  {                                                                              \
+    double v;                                                                    \
+    if (scheme_current_thread->constant_folding) return fl_ ## op (argc, argv);  \
+    v = scheme_double_ ## op (SCHEME_DBL_VAL(argv[0]), SCHEME_DBL_VAL(argv[1])); \
+    return scheme_make_double(v);                                                \
   }
 
-SAFE_BIN_FL(expt)
+SAFE_UNSAFE_BIN_FL(expt)
 
 static Scheme_Object *fx_to_extfl (int argc, Scheme_Object *argv[])
 {

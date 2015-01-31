@@ -77,6 +77,11 @@ static int is_inline_unboxable_op(Scheme_Object *obj, int flag, int unsafely, in
     if (IS_NAMED_PRIM(obj, "unsafe-flimag-part")) return 1;
     if (IS_NAMED_PRIM(obj, "unsafe-flreal-part")) return 1;
 
+    if (IS_NAMED_PRIM(obj, "unsafe-flfloor")) return 1;
+    if (IS_NAMED_PRIM(obj, "unsafe-flceiling")) return 1;
+    if (IS_NAMED_PRIM(obj, "unsafe-fltruncate")) return 1;
+    if (IS_NAMED_PRIM(obj, "unsafe-flround")) return 1;
+
     if (unsafely) {
       /* These are inline-unboxable when their args are
          safely inline-unboxable: */
@@ -904,13 +909,13 @@ static int generate_float_point_arith(mz_jit_state *jitter, Scheme_Object *rator
               f = call_exp;
             else if (IS_NAMED_PRIM(rator, "fllog"))
               f = call_log;
-            else if (IS_NAMED_PRIM(rator, "flfloor"))
+            else if (IS_NAMED_PRIM(rator, "flfloor") || IS_NAMED_PRIM(rator, "unsafe-flfloor"))
               f = call_floor;
-            else if (IS_NAMED_PRIM(rator, "flceiling"))
+            else if (IS_NAMED_PRIM(rator, "flceiling") || IS_NAMED_PRIM(rator, "unsafe-flceiling"))
               f = call_ceiling;
-            else if (IS_NAMED_PRIM(rator, "fltruncate"))
+            else if (IS_NAMED_PRIM(rator, "fltruncate") || IS_NAMED_PRIM(rator, "unsafe-fltruncate"))
               f = call_truncate;
-            else if (IS_NAMED_PRIM(rator, "flround"))
+            else if (IS_NAMED_PRIM(rator, "flround") || IS_NAMED_PRIM(rator, "unsafe-flround"))
               f = call_round;
             else {
               scheme_signal_error("internal error: unknown flonum function");

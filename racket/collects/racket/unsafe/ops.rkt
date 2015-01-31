@@ -12,7 +12,6 @@
          (prefix-out unsafe-
                      (combine-out flsin flcos fltan
                                   flasin flacos flatan
-                                  fltruncate flround flfloor flceiling
                                   flexp fllog flexpt
 
                                   extflsin extflcos extfltan

@@ -186,6 +186,11 @@ static Scheme_Object *fl_set (int argc, Scheme_Object *argv[]);
 static Scheme_Object *unsafe_fx_to_extfl (int argc, Scheme_Object *argv[]);
 static Scheme_Object *unsafe_extfl_to_fx (int argc, Scheme_Object *argv[]);
 
+static Scheme_Object *unsafe_fl_floor (int argc, Scheme_Object *argv[]);
+static Scheme_Object *unsafe_fl_ceiling (int argc, Scheme_Object *argv[]);
+static Scheme_Object *unsafe_fl_truncate (int argc, Scheme_Object *argv[]);
+static Scheme_Object *unsafe_fl_round (int argc, Scheme_Object *argv[]);
+
 static Scheme_Object *unsafe_flvector_length (int argc, Scheme_Object *argv[]);
 static Scheme_Object *unsafe_flvector_ref (int argc, Scheme_Object *argv[]);
 static Scheme_Object *unsafe_flvector_set (int argc, Scheme_Object *argv[]);
@@ -1347,6 +1352,54 @@ void scheme_init_unsafe_number(Scheme_Env *env)
                                                             | SCHEME_PRIM_WANTS_FLONUM_FIRST
                                                             | SCHEME_PRIM_PRODUCES_FIXNUM);
   scheme_add_global_constant("unsafe-fl->fx", p, env);
+
+  p = scheme_make_folding_prim(unsafe_fl_truncate, "unsafe-fltruncate", 1, 1, 1);
+  if (scheme_can_inline_fp_op())
+    flags = SCHEME_PRIM_IS_UNARY_INLINED;
+  else
+    flags = SCHEME_PRIM_SOMETIMES_INLINED;
+  SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(flags
+/*                                                            | SCHEME_PRIM_IS_UNSAFE_OMITABLE */
+/*                                                            | SCHEME_PRIM_IS_OMITABLE */
+                                                            | SCHEME_PRIM_WANTS_FLONUM_FIRST
+                                                            | SCHEME_PRIM_PRODUCES_FLONUM);
+  scheme_add_global_constant("unsafe-fltruncate", p, env);
+
+  p = scheme_make_folding_prim(unsafe_fl_round, "unsafe-flround", 1, 1, 1);
+  if (scheme_can_inline_fp_op())
+    flags = SCHEME_PRIM_IS_UNARY_INLINED;
+  else
+    flags = SCHEME_PRIM_SOMETIMES_INLINED;
+  SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(flags
+/*                                                            | SCHEME_PRIM_IS_UNSAFE_OMITABLE */
+/*                                                            | SCHEME_PRIM_IS_OMITABLE */
+                                                            | SCHEME_PRIM_WANTS_FLONUM_FIRST
+                                                            | SCHEME_PRIM_PRODUCES_FLONUM);
+  scheme_add_global_constant("unsafe-flround", p, env);
+
+  p = scheme_make_folding_prim(unsafe_fl_ceiling, "unsafe-flceiling", 1, 1, 1);
+  if (scheme_can_inline_fp_op())
+    flags = SCHEME_PRIM_IS_UNARY_INLINED;
+  else
+    flags = SCHEME_PRIM_SOMETIMES_INLINED;
+  SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(flags
+/*                                                            | SCHEME_PRIM_IS_UNSAFE_OMITABLE */
+/*                                                            | SCHEME_PRIM_IS_OMITABLE */
+                                                            | SCHEME_PRIM_WANTS_FLONUM_FIRST
+                                                            | SCHEME_PRIM_PRODUCES_FLONUM);
+  scheme_add_global_constant("unsafe-flceiling", p, env);
+
+  p = scheme_make_folding_prim(unsafe_fl_floor, "unsafe-flfloor", 1, 1, 1);
+  if (scheme_can_inline_fp_op())
+    flags = SCHEME_PRIM_IS_UNARY_INLINED;
+  else
+    flags = SCHEME_PRIM_SOMETIMES_INLINED;
+  SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(flags
+/*                                                            | SCHEME_PRIM_IS_UNSAFE_OMITABLE */
+/*                                                            | SCHEME_PRIM_IS_OMITABLE */
+                                                            | SCHEME_PRIM_WANTS_FLONUM_FIRST
+                                                            | SCHEME_PRIM_PRODUCES_FLONUM);
+  scheme_add_global_constant("unsafe-flfloor", p, env);
 
   p = scheme_make_immed_prim(fl_ref, "unsafe-f64vector-ref",
                              2, 2);
@@ -5268,6 +5321,20 @@ static Scheme_Object *fl_set (int argc, Scheme_Object *argv[])
   ((double *)SCHEME_CPTR_VAL(p))[SCHEME_INT_VAL(argv[1])] = SCHEME_DBL_VAL(argv[2]);
   return scheme_void;
 }
+
+#define UNSAFE_FL(op) \
+  static Scheme_Object * unsafe_fl_ ## op (int argc, Scheme_Object *argv[])     \
+  {                                                                             \
+    double v;                                                                   \
+    if (scheme_current_thread->constant_folding) return fl_ ## op (argc, argv); \
+    v = scheme_double_ ## op (SCHEME_DBL_VAL(argv[0]));                         \
+    return scheme_make_double(v);                                               \
+  }
+
+UNSAFE_FL(floor)
+UNSAFE_FL(ceiling)
+UNSAFE_FL(truncate)
+UNSAFE_FL(round)
 
 static Scheme_Object *unsafe_flvector_length (int argc, Scheme_Object *argv[])
 {

@@ -1359,8 +1359,8 @@ void scheme_init_unsafe_number(Scheme_Env *env)
   else
     flags = SCHEME_PRIM_SOMETIMES_INLINED;
   SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(flags
-/*                                                            | SCHEME_PRIM_IS_UNSAFE_OMITABLE */
-/*                                                            | SCHEME_PRIM_IS_OMITABLE */
+                                                            | SCHEME_PRIM_IS_UNSAFE_OMITABLE
+                                                            | SCHEME_PRIM_IS_OMITABLE
                                                             | SCHEME_PRIM_WANTS_FLONUM_FIRST
                                                             | SCHEME_PRIM_PRODUCES_FLONUM);
   scheme_add_global_constant("unsafe-fltruncate", p, env);
@@ -1371,8 +1371,8 @@ void scheme_init_unsafe_number(Scheme_Env *env)
   else
     flags = SCHEME_PRIM_SOMETIMES_INLINED;
   SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(flags
-/*                                                            | SCHEME_PRIM_IS_UNSAFE_OMITABLE */
-/*                                                            | SCHEME_PRIM_IS_OMITABLE */
+                                                            | SCHEME_PRIM_IS_UNSAFE_OMITABLE
+                                                            | SCHEME_PRIM_IS_OMITABLE
                                                             | SCHEME_PRIM_WANTS_FLONUM_FIRST
                                                             | SCHEME_PRIM_PRODUCES_FLONUM);
   scheme_add_global_constant("unsafe-flround", p, env);
@@ -1383,8 +1383,8 @@ void scheme_init_unsafe_number(Scheme_Env *env)
   else
     flags = SCHEME_PRIM_SOMETIMES_INLINED;
   SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(flags
-/*                                                            | SCHEME_PRIM_IS_UNSAFE_OMITABLE */
-/*                                                            | SCHEME_PRIM_IS_OMITABLE */
+                                                            | SCHEME_PRIM_IS_UNSAFE_OMITABLE
+                                                            | SCHEME_PRIM_IS_OMITABLE
                                                             | SCHEME_PRIM_WANTS_FLONUM_FIRST
                                                             | SCHEME_PRIM_PRODUCES_FLONUM);
   scheme_add_global_constant("unsafe-flceiling", p, env);
@@ -1395,8 +1395,8 @@ void scheme_init_unsafe_number(Scheme_Env *env)
   else
     flags = SCHEME_PRIM_SOMETIMES_INLINED;
   SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(flags
-/*                                                            | SCHEME_PRIM_IS_UNSAFE_OMITABLE */
-/*                                                            | SCHEME_PRIM_IS_OMITABLE */
+                                                            | SCHEME_PRIM_IS_UNSAFE_OMITABLE
+                                                            | SCHEME_PRIM_IS_OMITABLE
                                                             | SCHEME_PRIM_WANTS_FLONUM_FIRST
                                                             | SCHEME_PRIM_PRODUCES_FLONUM);
   scheme_add_global_constant("unsafe-flfloor", p, env);

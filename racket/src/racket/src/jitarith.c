@@ -474,6 +474,7 @@ static int can_fast_double(int arith, int cmp, int two_args)
       || (arith == ARITH_EX_INEX)
       || (arith == ARITH_SQRT)
       || (arith == ARITH_FLUNOP)
+      || (arith == ARITH_ROUND)
       || (arith == ARITH_INEX_EX))
     return 1;
 #endif
@@ -678,7 +679,9 @@ static int generate_float_point_arith(mz_jit_state *jitter, Scheme_Object *rator
     } else if (arith == ARITH_SQRT) {
       /* sqrt needs no extra number */
     } else if (arith == ARITH_FLUNOP) {
-      /* flround, flsin, etc. needs no extra number */
+      /* fltrucate, flsin, etc. needs no extra number */
+    } else if (arith == ARITH_ROUND) {
+      /* flround needs no extra number */
     } else if (arith == ARITH_EX_INEX) {
       /* exact->inexact needs no extra number */
     } else if (arith == ARITH_INEX_EX) {
@@ -915,8 +918,6 @@ static int generate_float_point_arith(mz_jit_state *jitter, Scheme_Object *rator
               f = call_ceiling;
             else if (IS_NAMED_PRIM(rator, "fltruncate") || IS_NAMED_PRIM(rator, "unsafe-fltruncate"))
               f = call_truncate;
-            else if (IS_NAMED_PRIM(rator, "flround") || IS_NAMED_PRIM(rator, "unsafe-flround"))
-              f = call_round;
             else {
               scheme_signal_error("internal error: unknown flonum function");
               f = NULL;
@@ -927,6 +928,9 @@ static int generate_float_point_arith(mz_jit_state *jitter, Scheme_Object *rator
             (void)mz_tl_ldi_d_fppush(JIT_FPR0, tl_scheme_jit_save_fp, JIT_R2);
           }
         }
+        break;
+      case ARITH_ROUND:
+        jit_FPSEL_roundr_xd_l_fppop(extfl, fpr0, fpr0);
         break;
       case ARITH_EXPT: /* flexpt */
         {
@@ -1137,6 +1141,7 @@ int scheme_generate_arith_for(mz_jit_state *jitter, Scheme_Object *rator, Scheme
         arith = 13 -> sqrt
         arith = 14 -> unary floating-point op (consult `rator')
         arith = 15 -> inexact->exact
+        arith = 17 -> round
         cmp = 0 -> = or zero?
         cmp = +/-1 -> >=/<=
         cmp = +/-2 -> >/< or positive/negative?

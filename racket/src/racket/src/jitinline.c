@@ -1738,7 +1738,6 @@ int scheme_generate_inlined_unary(mz_jit_state *jitter, Scheme_App2_Rec *app, in
       return 1;
     } else if (IS_NAMED_PRIM(rator, "flfloor")
                || IS_NAMED_PRIM(rator, "flceiling")
-               || IS_NAMED_PRIM(rator, "flround")
                || IS_NAMED_PRIM(rator, "fltruncate")
                || IS_NAMED_PRIM(rator, "flsin")
                || IS_NAMED_PRIM(rator, "flcos")
@@ -1752,9 +1751,14 @@ int scheme_generate_inlined_unary(mz_jit_state *jitter, Scheme_App2_Rec *app, in
       return 1;
     } else if (IS_NAMED_PRIM(rator, "unsafe-flfloor")
                || IS_NAMED_PRIM(rator, "unsafe-flceiling")
-               || IS_NAMED_PRIM(rator, "unsafe-flround")
                || IS_NAMED_PRIM(rator, "unsafe-fltruncate")) {
       scheme_generate_arith(jitter, rator, app->rand, NULL, 1, ARITH_FLUNOP, 0, 0, NULL, 1, 0, 1, NULL, dest);
+      return 1;
+    } else if (IS_NAMED_PRIM(rator, "flround") {
+      scheme_generate_arith(jitter, rator, app->rand, NULL, 1, ARITH_ROUND, 0, 0, NULL, 1, 0, -1, NULL, dest);
+      return 1;
+    } else if (IS_NAMED_PRIM(rator, "unsafe-flround") {
+      scheme_generate_arith(jitter, rator, app->rand, NULL, 1, ARITH_ROUND, 0, 0, NULL, 1, 0, 1, NULL, dest);
       return 1;
     } else if (IS_NAMED_PRIM(rator, "exact->inexact")
 	       || IS_NAMED_PRIM(rator, "real->double-flonum")) {

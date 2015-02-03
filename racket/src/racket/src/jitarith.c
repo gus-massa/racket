@@ -930,7 +930,21 @@ static int generate_float_point_arith(mz_jit_state *jitter, Scheme_Object *rator
         }
         break;
       case ARITH_ROUND:
-        jit_FPSEL_roundr_xd_l_fppop(extfl, fpr0, fpr0);
+        {
+              int fpr0 USED_ONLY_SOMETIMES;
+
+              jit_FPSEL_roundr_xd_l_fppop(extfl, fpr0, fpr0);
+
+              jit_FPSEL_extr_l_xd_fppush(extfl, fpr0, JIT_R0);
+              CHECK_LIMIT();
+              if (!ubs.unbox) {
+                mz_rs_sync(); /* needed for unsafe op before allocation */
+                scheme_generate_alloc_X_double(jitter, 0, dest, extfl);
+              } else {
+                jitter->unbox_depth++;
+              }
+              CHECK_LIMIT();
+        }
         break;
       case ARITH_EXPT: /* flexpt */
         {

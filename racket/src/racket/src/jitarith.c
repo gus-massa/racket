@@ -605,6 +605,41 @@ int scheme_generate_alloc_X_double(mz_jit_state *jitter, int inline_retry, int d
                  return scheme_generate_alloc_double(jitter, inline_retry, dest));
 }
 
+int generate_roundr_l(mz_jit_state *jitter, Scheme_Object *rator, int extfl, int dest, int rand)
+{
+  if (IS_NAMED_PRIM(rator, "inexact->exact")
+      || IS_NAMED_PRIM(rator, "unsafe-fl->fx")
+      || IS_NAMED_PRIM(rator, "fl->exact-integer")
+      || IS_NAMED_PRIM(rator, "fl->fx")
+#ifdef MZ_LONG_DOUBLE
+      || IS_NAMED_PRIM(rator, "extfl->exact")
+      || IS_NAMED_PRIM(rator, "unsafe-extfl->fx")
+      || IS_NAMED_PRIM(rator, "extfl->exact-integer")
+      || IS_NAMED_PRIM(rator, "extfl->fx")
+#endif
+      ) {
+    /* In thee cases rand should be an integer flonum. 
+       The rounding method is unespececified and is visible only in the unsafe case. 
+       round has currently the most direct implementation. */
+    jit_FPSEL_roundr_xd_l_fppop(extfl, dest, rand);
+  } else if (IS_NAMED_PRIM(rator, "unsafe-flround->fx")
+             || IS_NAMED_PRIM(rator, "flround->fx")) {
+    jit_FPSEL_roundr_xd_l_fppop(extfl, dest, rand);
+  } else if (IS_NAMED_PRIM(rator, "unsafe-fltruncate->fx")
+             || IS_NAMED_PRIM(rator, "fltruncate->fx")) {
+    jit_FPSEL_roundr_xd_l_fppop(extfl, dest, rand);
+  } else if (IS_NAMED_PRIM(rator, "unsafe-flceiling->fx")
+             || IS_NAMED_PRIM(rator, "flceiling->fx")) {
+    jit_FPSEL_roundr_xd_l_fppop(extfl, dest, rand);
+  } else if (IS_NAMED_PRIM(rator, "unsafe-flfloor->fx")
+             || IS_NAMED_PRIM(rator, "flfloor->fx")) {
+    jit_FPSEL_roundr_xd_l_fppop(extfl, dest, rand);
+  } else {
+    scheme_signal_error("internal error: unknown rounding function");
+  }
+  return 1;
+}
+
 static int generate_float_point_arith(mz_jit_state *jitter, Scheme_Object *rator,
                                       int arith, int cmp, int reversed, int two_args, int second_const,
                                       jit_insn **_refd, jit_insn **_refdt, Branch_Info *for_branch,
@@ -816,7 +851,7 @@ static int generate_float_point_arith(mz_jit_state *jitter, Scheme_Object *rator
         if (!unsafe_fl) {
           jit_FPSEL_movr_xd_fppush(extfl, fpr1, fpr0);
         }
-        jit_FPSEL_roundr_xd_l_fppop(extfl, JIT_R1, fpr0);
+        generate_roundr_l(jitter, rator, extfl, JIT_R1, fpr0);
         if (!unsafe_fl) {
           /* to check whether it fits in a fixnum, we
              need to convert back and check whether it
@@ -837,7 +872,7 @@ static int generate_float_point_arith(mz_jit_state *jitter, Scheme_Object *rator
           __END_TINY_JUMPS__(1);
 #if !defined(DIRECT_FPR_ACCESS) || defined(MZ_LONG_DOUBLE)
           if (unboxed && !USES_DIRECT_FPR_ACCESS)
-            jit_FPSEL_roundr_xd_l_fppop(extfl, JIT_R1, JIT_FPR2); /* slow path won't be needed */
+            generate_roundr_l(jitter, rator, extfl, JIT_R1, JIT_FPR2); /* slow path won't be needed */
 #endif
         }
         jit_fixnum_l(dest, JIT_R1);

@@ -1771,6 +1771,18 @@ int scheme_generate_inlined_unary(mz_jit_state *jitter, Scheme_App2_Rec *app, in
                || IS_NAMED_PRIM(rator, "fl->fx")) {
       scheme_generate_arith(jitter, rator, app->rand, NULL, 1, ARITH_INEX_EX, 0, 0, NULL, 1, 0, -1, NULL, dest);
       return 1;
+    } else if (IS_NAMED_PRIM(rator, "unsafe-fltruncate->fx")
+               || IS_NAMED_PRIM(rator, "unsafe-flround->fx")
+               || IS_NAMED_PRIM(rator, "unsafe-flceiling->fx")
+               || IS_NAMED_PRIM(rator, "unsafe-flfloor->fx")) {
+      scheme_generate_arith(jitter, rator, app->rand, NULL, 1, ARITH_INEX_EX, 0, 0, NULL, 1, 0, 1, NULL, dest);
+      return 1;
+    } else if (IS_NAMED_PRIM(rator, "fltruncate->fx")
+               || IS_NAMED_PRIM(rator, "flround->fx")
+               || IS_NAMED_PRIM(rator, "flceiling->fx")
+               || IS_NAMED_PRIM(rator, "flfloor->fx")) {
+      scheme_generate_arith(jitter, rator, app->rand, NULL, 1, ARITH_INEX_EX, 0, 0, NULL, 1, 0, -1, NULL, dest);
+      return 1;
 #ifdef MZ_LONG_DOUBLE
     } else if (IS_NAMED_PRIM(rator, "unsafe-extflabs")) {
       scheme_generate_extflonum_arith(jitter, rator, app->rand, NULL, 1, ARITH_ABS, 0, 0, NULL, 1, 0, 1, NULL, dest);

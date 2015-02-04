@@ -8,7 +8,9 @@
 (provide fl+ fl- fl* fl/
          flabs flsqrt flexp fllog
          flsin flcos fltan flasin flacos flatan
-         flfloor flceiling flround fltruncate flexpt
+         flfloor flceiling flround fltruncate
+         flexpt
+         flfloor->fx flceiling->fx flround->fx fltruncate->fx
          flrandom
          fl= fl< fl<= fl> fl>= flmin flmax
          ->fl fl->exact-integer

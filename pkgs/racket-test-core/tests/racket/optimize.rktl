@@ -20,6 +20,7 @@
   (namespace-require 'racket/extflonum)
   (namespace-require 'racket/fixnum)
   (namespace-require 'racket/unsafe/undefined)
+  (namespace-require 'racket/unsafe/ops)
   (eval '(define-values (prop:thing thing? thing-ref) 
            (make-struct-type-property 'thing)))
   (eval '(struct rock (x) #:property prop:thing 'yes))
@@ -416,6 +417,7 @@
 
     (for-each
      (lambda (v)
+       (define (ev f x) (f (fl+ x (fx->fl (random 1)))))
        (define (once v)
          (un-exact (round v) 'flround v #t)
          (un-exact (ceiling v) 'flceiling v #t)
@@ -424,7 +426,18 @@
          (un-exact (fl->exact-integer (round v)) 'flround->fx v #t)
          (un-exact (fl->exact-integer (ceiling v)) 'flceiling->fx v #t)
          (un-exact (fl->exact-integer (floor v)) 'flfloor->fx v #t)
-         (un-exact (fl->exact-integer (truncate v)) 'fltruncate->fx v #t))
+         (un-exact (fl->exact-integer (truncate v)) 'fltruncate->fx v #t)
+
+         (test (fl->exact-integer (round v)) '1flround->fx (ev unsafe-flround->fx v))
+         (test (fl->exact-integer (ceiling v)) '1flceiling->fx (ev unsafe-flceiling->fx v))
+         (test (fl->exact-integer (floor v)) '1flfloor->fx (ev unsafe-flfloor->fx v))
+         (test (fl->exact-integer (truncate v)) '1fltruncate->fx (ev unsafe-fltruncate->fx v))
+
+         (test (fl->exact-integer (round v)) '2flround->fx (ev (lambda (x) (unsafe-flround->fx x)) v))
+         (test (fl->exact-integer (ceiling v)) '2flceiling->fx (ev (lambda (x) (unsafe-flceiling->fx x)) v))
+         (test (fl->exact-integer (floor v)) '2flfloor->fx (ev (lambda (x) (unsafe-flfloor->fx x)) v))
+         (test (fl->exact-integer (truncate v)) '2fltruncate->fx (ev (lambda (x) (unsafe-fltruncate->fx x)) v))
+         )
        (once v)
        (once (- v)))
      '(3.0 3.1 3.5 3.8 4.0 4.1 4.5 4.8 0.0))

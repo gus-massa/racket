@@ -1245,6 +1245,9 @@
            '(lambda (w z) #t)
            #f)
 
+(test-comp '(lambda (f l) (map f l) #t)
+           '(lambda (f l) (map f l) (procedure? f)))
+
 (test-comp '(lambda (w z)
               (let ([x (list* w z)]
                     [y (list* z w)])

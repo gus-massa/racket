@@ -27,7 +27,9 @@
                      (cond
                       [(null? l) null]
                       [else (cons (f (car l)) (loop (cdr l)))]))
-                   (map f l))]
+                   (begin
+                     (map f l)
+                     (error 'unreachable)))]
               [(f l1 l2)
                (if (and (procedure? f)
                         (procedure-arity-includes? f 2)
@@ -39,7 +41,9 @@
                       [(null? l1) null]
                       [else (cons (f (car l1) (car l2)) 
                                   (loop (cdr l1) (cdr l2)))]))
-                   (map f l1 l2))]
+                   (begin
+                     (map f l1 l2)
+                     (error 'unreachable)))]
               [(f l . args) (apply map f l args)])])
         map))
   

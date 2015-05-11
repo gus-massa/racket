@@ -5365,6 +5365,7 @@ scheme_optimize_lets(Scheme_Object *form, Optimize_Info *info, int for_inline, i
             info->single_result = sub_info->single_result;
             info->preserves_marks = sub_info->preserves_marks;
             optimize_info_done(sub_info, NULL);
+            printf ("***************(dead code (let ([x M]) (if x x N)))***************");
           }
 
           return form;
@@ -5390,6 +5391,7 @@ scheme_optimize_lets(Scheme_Object *form, Optimize_Info *info, int for_inline, i
           info->next->single_result = info->single_result;
           info->next->preserves_marks = info->preserves_marks;
           optimize_info_done(info, NULL);
+          printf ("***************(dead code (let ([x E]) x))***************");
           return body;
 	}
       }

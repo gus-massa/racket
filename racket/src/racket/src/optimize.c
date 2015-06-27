@@ -3935,19 +3935,21 @@ static void merge_types(Optimize_Info *src_info, Optimize_Info *info, int delta)
   }
 }
 
-Scheme_Hash_Tree *intersect_and_merge_types(Scheme_Hash_Tree *t_types, Scheme_Hash_Tree *f_types,
-                                            Scheme_Hash_Tree *base_types)
+static void intersect_and_merge_types(Optimize_Info *t_info, Optimize_Info *f_info,
+                                      Optimize_Info *base_info)
 /* return (union (intersetion t_type f_types) base_types) 
    in case a key is already in base_type, the value is not modified*/
 {
+  Scheme_Hash_Tree *t_types = t_info->types, *f_types = f_info->types,
+                   *base_types = base_info->types;
   Scheme_Object *pos, *t_pred, *f_pred, *base_pred;
   intptr_t i;
 
   if (!t_types || !f_types)
-    return base_types;
+    return;
 
-  if (base_types  && (SAME_OBJ(f_types, base_types) || SAME_OBJ(t_types, base_types)))
-    return base_types;
+  if (base_types && (SAME_OBJ(f_types, base_types) || SAME_OBJ(t_types, base_types)))
+    return;
 
   if (f_types->count > t_types->count) {
     Scheme_Hash_Tree *swap = f_types;
@@ -3973,7 +3975,7 @@ Scheme_Hash_Tree *intersect_and_merge_types(Scheme_Hash_Tree *t_types, Scheme_Ha
     }
     i = scheme_hash_tree_next(f_types, i);
   }
-  return base_types;
+  base_info->types = base_types;
 }
 
 static int relevant_predicate(Scheme_Object *pred)
@@ -4195,15 +4197,13 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
       info->escapes = 0;
 
   } else {
-    Scheme_Hash_Tree *init_types;
     then_preserves_marks = or_tentative(then_preserves_marks, info->preserves_marks);
     info->preserves_marks = then_preserves_marks;
     then_single_result = or_tentative(then_single_result, info->single_result);
     info->single_result = then_single_result;
     if (then_kclock > info->kclock)
       info->kclock = then_kclock;
-    init_types = intersect_and_merge_types(then_info->types, else_info->types, info->types);
-    info->types = init_types;
+    intersect_and_merge_types(then_info, else_info, info);
   }
 
   if (then_sclock > info->sclock)

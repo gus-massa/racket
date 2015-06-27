@@ -4038,7 +4038,6 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   Scheme_Branch_Rec *b;
   Scheme_Object *t, *tb, *fb;
   int init_vclock, init_kclock, init_sclock;
-  int then_escapes, then_preserves_marks, then_single_result;
   int then_vclock, then_kclock, then_sclock;
   Optimize_Info *then_info, *else_info;
   Optimize_Info_Sequence info_seq;
@@ -4157,12 +4156,7 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   add_types(t, then_info, 5);
   tb = scheme_optimize_expr(tb, then_info, scheme_optimize_tail_context(context));
   optimize_info_done(then_info, NULL);
-  info->single_result = then_info->single_result;
-  info->preserves_marks = then_info->preserves_marks;
-
-  then_preserves_marks = info->preserves_marks;
-  then_single_result = info->single_result;
-  then_escapes = info->escapes;
+  info->escapes = 0;
   then_vclock = info->vclock;
   then_kclock = info->kclock;
   then_sclock = info->sclock;
@@ -4176,31 +4170,33 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   else_info = optimize_info_add_frame(info, 0, 0, 0);
   fb = scheme_optimize_expr(fb, else_info, scheme_optimize_tail_context(context));
   optimize_info_done(else_info, NULL);
-  info->single_result = else_info->single_result;
-  info->preserves_marks = else_info->preserves_marks;
 
-  if (info->escapes && then_escapes) {
+  if (then_info->escapes && else_info->escapes) {
     /* both branches escaped */
     info->preserves_marks = 1;
     info->single_result = 1;
     info->kclock = init_kclock;
 
   } else if (info->escapes) {
-    info->preserves_marks = then_preserves_marks;
-    info->single_result = then_single_result;
+    info->preserves_marks = then_info->preserves_marks;
+    info->single_result = then_info->single_result;
     info->kclock = then_kclock;
     merge_types(then_info, info, 0);
     info->escapes = 0;
 
-  } else if (then_escapes) {
+  } else if (then_info->escapes) {
+      info->preserves_marks = else_info->preserves_marks;
+      info->single_result = else_info->single_result;
       merge_types(else_info, info, 0);
       info->escapes = 0;
 
   } else {
-    then_preserves_marks = or_tentative(then_preserves_marks, info->preserves_marks);
-    info->preserves_marks = then_preserves_marks;
-    then_single_result = or_tentative(then_single_result, info->single_result);
-    info->single_result = then_single_result;
+    int new_preserves_marks, new_single_result;
+
+    new_preserves_marks = or_tentative(then_info->preserves_marks, else_info->preserves_marks);
+    info->preserves_marks = new_preserves_marks;
+    new_single_result = or_tentative(then_info->single_result, else_info->single_result);
+    info->single_result = new_single_result;
     if (then_kclock > info->kclock)
       info->kclock = then_kclock;
     intersect_and_merge_types(then_info, else_info, info);

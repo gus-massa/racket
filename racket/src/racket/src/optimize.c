@@ -4038,7 +4038,6 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   Scheme_Branch_Rec *b;
   Scheme_Object *t, *tb, *fb;
   int init_vclock, init_kclock, init_sclock;
-  int then_vclock, then_kclock, then_sclock;
   Optimize_Info *then_info, *else_info;
   Optimize_Info_Sequence info_seq;
 
@@ -4156,11 +4155,8 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   add_types(t, then_info, 5);
   tb = scheme_optimize_expr(tb, then_info, scheme_optimize_tail_context(context));
   optimize_info_done(then_info, NULL);
-  info->escapes = 0;
-  then_vclock = info->vclock;
-  then_kclock = info->kclock;
-  then_sclock = info->sclock;
 
+  info->escapes = 0;
   info->vclock = init_vclock;
   info->kclock = init_kclock;
   info->sclock = init_sclock;
@@ -4180,7 +4176,7 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   } else if (info->escapes) {
     info->preserves_marks = then_info->preserves_marks;
     info->single_result = then_info->single_result;
-    info->kclock = then_kclock;
+    info->kclock = then_info->kclock;
     merge_types(then_info, info, 0);
     info->escapes = 0;
 
@@ -4197,15 +4193,15 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
     info->preserves_marks = new_preserves_marks;
     new_single_result = or_tentative(then_info->single_result, else_info->single_result);
     info->single_result = new_single_result;
-    if (then_kclock > info->kclock)
-      info->kclock = then_kclock;
+    if (then_info->kclock > info->kclock)
+      info->kclock = then_info->kclock;
     intersect_and_merge_types(then_info, else_info, info);
   }
 
-  if (then_sclock > info->sclock)
-    info->sclock = then_sclock;
+  if (then_info->sclock > info->sclock)
+    info->sclock = then_info->sclock;
 
-  if ((init_vclock == then_vclock) && (init_vclock == info->vclock)) {
+  if ((init_vclock == then_info->vclock) && (init_vclock == info->vclock)) {
     /* we can rewind the vclock to just after the test, because the
        `if` as a whole has no effect */
     info->vclock--;

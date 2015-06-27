@@ -4039,6 +4039,7 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   int init_vclock, init_kclock, init_sclock;
   int then_escapes, then_preserves_marks, then_single_result;
   int then_vclock, then_kclock, then_sclock;
+  Optimize_Info *then_info, *else_info;
   Optimize_Info_Sequence info_seq;
 
   b = (Scheme_Branch_Rec *)o;
@@ -4152,9 +4153,13 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   init_sclock = info->sclock;
   init_types = info->types;
 
-  add_types(t, info, 5);
-
-  tb = scheme_optimize_expr(tb, info, scheme_optimize_tail_context(context));
+  then_info = optimize_info_add_frame(info, 0, 0, 0);
+  add_types(t, then_info, 5);
+  tb = scheme_optimize_expr(tb, then_info, scheme_optimize_tail_context(context));
+  optimize_info_done(then_info, NULL);
+  info->single_result = then_info->single_result;
+  info->preserves_marks = then_info->preserves_marks;
+  merge_types(then_info, info, 0);
 
   then_types = info->types;
   then_preserves_marks = info->preserves_marks;
@@ -4171,7 +4176,12 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
 
   optimize_info_seq_step(info, &info_seq);
 
-  fb = scheme_optimize_expr(fb, info, scheme_optimize_tail_context(context));
+  else_info = optimize_info_add_frame(info, 0, 0, 0);
+  fb = scheme_optimize_expr(fb, else_info, scheme_optimize_tail_context(context));
+  optimize_info_done(else_info, NULL);
+  info->single_result = else_info->single_result;
+  info->preserves_marks = else_info->preserves_marks;
+  merge_types(else_info, info, 0);
 
   if (info->escapes && then_escapes) {
     /* both branches escaped */

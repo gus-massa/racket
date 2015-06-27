@@ -4035,7 +4035,6 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
 {
   Scheme_Branch_Rec *b;
   Scheme_Object *t, *tb, *fb;
-  Scheme_Hash_Tree *init_types, *then_types;
   int init_vclock, init_kclock, init_sclock;
   int then_escapes, then_preserves_marks, then_single_result;
   int then_vclock, then_kclock, then_sclock;
@@ -4151,7 +4150,6 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   init_vclock = info->vclock;
   init_kclock = info->kclock;
   init_sclock = info->sclock;
-  init_types = info->types;
 
   then_info = optimize_info_add_frame(info, 0, 0, 0);
   add_types(t, then_info, 5);
@@ -4159,9 +4157,7 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   optimize_info_done(then_info, NULL);
   info->single_result = then_info->single_result;
   info->preserves_marks = then_info->preserves_marks;
-  merge_types(then_info, info, 0);
 
-  then_types = info->types;
   then_preserves_marks = info->preserves_marks;
   then_single_result = info->single_result;
   then_escapes = info->escapes;
@@ -4169,7 +4165,6 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   then_kclock = info->kclock;
   then_sclock = info->sclock;
 
-  info->types = init_types;
   info->vclock = init_vclock;
   info->kclock = init_kclock;
   info->sclock = init_sclock;
@@ -4181,33 +4176,33 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   optimize_info_done(else_info, NULL);
   info->single_result = else_info->single_result;
   info->preserves_marks = else_info->preserves_marks;
-  merge_types(else_info, info, 0);
 
   if (info->escapes && then_escapes) {
     /* both branches escaped */
     info->preserves_marks = 1;
     info->single_result = 1;
     info->kclock = init_kclock;
-    info->types = init_types; /* not sure if this is necesary */
 
   } else if (info->escapes) {
     info->preserves_marks = then_preserves_marks;
     info->single_result = then_single_result;
     info->kclock = then_kclock;
-    info->types = then_types;
+    merge_types(then_info, info, 0);
     info->escapes = 0;
 
   } else if (then_escapes) {
-    info->escapes = 0;
+      merge_types(else_info, info, 0);
+      info->escapes = 0;
 
   } else {
+    Scheme_Hash_Tree *init_types;
     then_preserves_marks = or_tentative(then_preserves_marks, info->preserves_marks);
     info->preserves_marks = then_preserves_marks;
     then_single_result = or_tentative(then_single_result, info->single_result);
     info->single_result = then_single_result;
     if (then_kclock > info->kclock)
       info->kclock = then_kclock;
-    init_types = intersect_and_merge_types(then_types, info->types, init_types);
+    init_types = intersect_and_merge_types(then_info->types, else_info->types, info->types);
     info->types = init_types;
   }
 

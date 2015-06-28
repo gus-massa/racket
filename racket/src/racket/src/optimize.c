@@ -87,6 +87,7 @@ struct Optimize_Info
   Scheme_Object *context; /* for logging */
   Scheme_Logger *logger;
   Scheme_Hash_Tree *types; /* maps position (from this frame) to predicate */
+  Scheme_Hash_Tree *const_types; /* maps position (from this frame) to a constant */
   int no_types;
 };
 
@@ -3917,6 +3918,18 @@ static void add_type(Optimize_Info *info, int pos, Scheme_Object *pred)
   info->types = new_types;
 }
 
+static void add_const_type(Optimize_Info *info, int pos, Scheme_Object *c)
+{
+  Scheme_Hash_Tree *new_const_types;
+  new_const_types = info->const_types;
+  if (!new_const_types)
+    new_const_types = scheme_make_hash_tree(0);
+  new_const_types = scheme_hash_tree_set(new_const_types,
+                                        scheme_make_integer(pos),
+                                        c);
+  info->const_types = new_const_types;
+}
+
 static void merge_types(Optimize_Info *src_info, Optimize_Info *info, int delta)
 {
   Scheme_Hash_Tree *types = src_info->types;
@@ -3932,6 +3945,24 @@ static void merge_types(Optimize_Info *src_info, Optimize_Info *info, int delta)
     if (SCHEME_INT_VAL(pos)+delta >= 0)
       add_type(info, SCHEME_INT_VAL(pos)+delta, pred);
     i = scheme_hash_tree_next(types, i);
+  }
+}
+
+static void merge_const_types(Optimize_Info *src_info, Optimize_Info *info, int delta)
+{
+  Scheme_Hash_Tree *const_types = src_info->const_types;
+  Scheme_Object *pos, *c;
+  intptr_t i;
+
+  if (!const_types)
+    return;
+  
+  i = scheme_hash_tree_next(const_types, -1);
+  while (i != -1) {
+    scheme_hash_tree_index(const_types, i, &pos, &c);
+    if (SCHEME_INT_VAL(pos)+delta >= 0)
+      add_const_type(info, SCHEME_INT_VAL(pos)+delta, c);
+    i = scheme_hash_tree_next(const_types, i);
   }
 }
 
@@ -3995,7 +4026,7 @@ static int relevant_predicate(Scheme_Object *pred)
           );
 }
 
-static void add_types(Scheme_Object *t, Optimize_Info *info, int fuel)
+static void add_types_for_t_branch(Scheme_Object *t, Optimize_Info *info, int fuel)
 {
   if (fuel < 0)
     return;
@@ -4010,11 +4041,42 @@ static void add_types(Scheme_Object *t, Optimize_Info *info, int fuel)
          operations to unsafe operations. */
       add_type(info, SCHEME_LOCAL_POS(app->rand), app->rator);
     }
+
+  } else if (SAME_TYPE(SCHEME_TYPE(t), scheme_application3_type)) {
+    Scheme_App3_Rec *app = (Scheme_App3_Rec *)t;
+    Scheme_Object *pred;
+    if (SAME_OBJ(app->rator, scheme_eq_prim)) {
+      /* If a local variable is compared to a constant, record that
+         the eq? succeeded in order to propagate the constant. */
+      if (SAME_TYPE(SCHEME_TYPE(app->rand1), scheme_local_type)) {
+        if ((SCHEME_TYPE(app->rand2) > _scheme_compiled_values_types_)
+            && (scheme_compiled_propagate_ok(app->rand2, info))) {
+          add_const_type(info, SCHEME_LOCAL_POS(app->rand1), app->rand2);
+        }
+        pred = expr_implies_predicate(app->rand2, info, 0, 5);
+        if (pred) {
+          printf("(X%d)", SCHEME_LOCAL_POS(app->rand1));
+          add_type(info, SCHEME_LOCAL_POS(app->rand1), pred);
+        }
+      }
+      if (SAME_TYPE(SCHEME_TYPE(app->rand2), scheme_local_type)) {
+        if ((SCHEME_TYPE(app->rand1) > _scheme_compiled_values_types_)
+            && (scheme_compiled_propagate_ok(app->rand1, info))) {
+          add_const_type(info, SCHEME_LOCAL_POS(app->rand2), app->rand1);
+        }
+        pred = expr_implies_predicate(app->rand1, info, 0, 5);
+        if (pred) {
+          printf("(X%d)", SCHEME_LOCAL_POS(app->rand2));
+          add_type(info, SCHEME_LOCAL_POS(app->rand2), pred);
+        }
+      }
+    }
+
   } else if (SAME_TYPE(SCHEME_TYPE(t), scheme_branch_type)) {
     Scheme_Branch_Rec *b = (Scheme_Branch_Rec *)t;
     if (SCHEME_FALSEP(b->fbranch)) {
-      add_types(b->test, info, fuel-1);
-      add_types(b->tbranch, info, fuel-1);
+      add_types_for_t_branch(b->test, info, fuel-1);
+      add_types_for_t_branch(b->tbranch, info, fuel-1);
     }
   }
 }
@@ -4036,6 +4098,7 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   Scheme_Branch_Rec *b;
   Scheme_Object *t, *tb, *fb;
   Scheme_Hash_Tree *init_types, *then_types;
+  Scheme_Hash_Tree *init_const_types, *then_const_types;
   int init_vclock, init_kclock, init_sclock;
   int then_escapes, then_preserves_marks, then_single_result;
   int then_vclock, then_kclock, then_sclock;
@@ -4151,12 +4214,14 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   init_kclock = info->kclock;
   init_sclock = info->sclock;
   init_types = info->types;
+  init_const_types = info->const_types;
 
-  add_types(t, info, 5);
+  add_types_for_t_branch(t, info, 5);
 
   tb = scheme_optimize_expr(tb, info, scheme_optimize_tail_context(context));
 
   then_types = info->types;
+  then_const_types = info->const_types;
   then_preserves_marks = info->preserves_marks;
   then_single_result = info->single_result;
   then_escapes = info->escapes;
@@ -4165,6 +4230,7 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   then_sclock = info->sclock;
 
   info->types = init_types;
+  info->const_types = init_const_types;
   info->vclock = init_vclock;
   info->kclock = init_kclock;
   info->sclock = init_sclock;
@@ -4179,12 +4245,14 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
     info->single_result = 1;
     info->kclock = init_kclock;
     info->types = init_types; /* not sure if this is necesary */
+    info->const_types = init_types; /* not sure if this is necesary */
 
   } else if (info->escapes) {
     info->preserves_marks = then_preserves_marks;
     info->single_result = then_single_result;
     info->kclock = then_kclock;
     info->types = then_types;
+    info->const_types = then_types;
     info->escapes = 0;
 
   } else if (then_escapes) {
@@ -4199,6 +4267,8 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
       info->kclock = then_kclock;
     init_types = intersect_and_merge_types(then_types, info->types, init_types);
     info->types = init_types;
+    init_const_types = intersect_and_merge_types(then_const_types, info->const_types, init_const_types);
+    info->const_types = init_const_types;
   }
 
   if (then_sclock > info->sclock)
@@ -8498,13 +8568,35 @@ static Scheme_Object *optimize_info_mutated_lookup(Optimize_Info *info, int pos,
 Scheme_Object *optimize_get_predicate(int pos, Optimize_Info *info)
 /* pos is in new-frame counts */
 {
-  Scheme_Object *pred;
+  Scheme_Object *c;
 
   if (info->no_types) return NULL;
 
   while (info) {
     if (info->types) {
-      pred = scheme_hash_tree_get(info->types, scheme_make_integer(pos));
+      c = scheme_hash_tree_get(info->types, scheme_make_integer(pos));
+      if (c)
+        return c;
+    }
+    pos -= info->new_frame;
+    if (pos < 0)
+      return NULL;
+      info = info->next;
+  }
+
+  return NULL;
+}
+
+Scheme_Object *optimize_get_const(int pos, Optimize_Info *info)
+/* pos is in new-frame counts */
+{
+  Scheme_Object *pred;
+
+  if (info->no_types) return NULL;
+
+  while (info) {
+    if (info->const_types) {
+      pred = scheme_hash_tree_get(info->const_types, scheme_make_integer(pos));
       if (pred)
         return pred;
     }

@@ -102,7 +102,8 @@
               pre pre/desc
               rest
               rngs
-              post post/desc)
+              post post/desc
+              #t #;optimistic)
              (build-chaperone-constructor/real
               '() ;; this-args 
               regular-args
@@ -144,7 +145,8 @@
                        #f #f
                        rest
                        rng-vars
-                       #f #f))
+                       #f #f
+                       #t #;optimistic))
                   (define #,(syntax-local-introduce chaperone-id)
                     #,(build-chaperone-constructor/real
                        '() ;; this arg
@@ -169,7 +171,8 @@
                     pre pre/desc
                     rest
                     rngs
-                    post post/desc)
+                    post post/desc
+                    optimistic)
   (with-syntax ([(regb ...) (generate-temporaries regular-args)]
                 [(optb ...) (generate-temporaries optional-args)]
                 [(kb ...) (generate-temporaries mandatory-kwds)]
@@ -177,9 +180,13 @@
                 [(rb ...) (generate-temporaries (or rngs '()))]
                 [(arg-x ...) (generate-temporaries regular-args)]
                 [(res-x ...) (generate-temporaries (or rngs '()))]
-                [(kwd-arg-x ...) (generate-temporaries mandatory-kwds)])
-
-    (define base-arg-expressions (reverse (syntax->list #'(((regb arg-x) neg-party) ...))))
+                [(kwd-arg-x ...) (generate-temporaries mandatory-kwds)]
+                [optimistic optimistic])
+    (define base-arg-expressions (reverse (syntax->list #'(
+                                                          (if optimistic
+                                                             (if (void? arg-x) (void) arg-x)
+                                                             ((regb arg-x) neg-party))
+                                                          ...))))
     (define normal-arg-vars (generate-temporaries #'(arg-x ...)))
     (define base-arg-vars normal-arg-vars)
 
@@ -281,7 +288,10 @@
                                       #'(res-x ...))))]
                                 [else
                                  post-check ...
-                                 (values ((rb res-x) neg-party) ...)])))]
+                                 (values (if optimistic
+                                           (if (void? res-x) (void) res-x)
+                                           ((rb res-x) neg-party))
+                                         ...)])))]
                        #`[#,the-args
                           pre-check ...
                           (let ([blame+neg-party (cons blame neg-party)])

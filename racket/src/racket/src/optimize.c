@@ -4071,16 +4071,78 @@ int scheme_compiled_duplicate_ok(Scheme_Object *fb, int cross_module)
           || SAME_TYPE(SCHEME_TYPE(fb), scheme_ctype_type));
 }
 
-static int equivalent_exprs(Scheme_Object *a, Scheme_Object *b)
+static Scheme_Object *equivalent_exprs(Scheme_Object *a, Scheme_Object *b,
+                                       Scheme_Hash_Tree *a_types, Scheme_Hash_Tree *b_types,
+                                       Optimize_Info *info, int context)
 {
   if (SAME_OBJ(a, b))
-    return 1;
+    return a;
   if (SAME_TYPE(SCHEME_TYPE(a), scheme_local_type)
       && SAME_TYPE(SCHEME_TYPE(b), scheme_local_type)
       && (SCHEME_LOCAL_POS(a) == SCHEME_LOCAL_POS(b)))
-    return 1;
+    return a;
 
-  return 0;
+  if (info 
+      && SAME_TYPE(SCHEME_TYPE(a), scheme_local_type)
+      && (SCHEME_TYPE(b) > _scheme_compiled_values_types_)) {
+    Scheme_Hash_Tree *temp;
+    Scheme_Object *pred;
+    Scheme_Object *x;
+
+    temp = info->types;
+    info->types = b_types;
+    pred = optimize_get_predicate(SCHEME_LOCAL_POS(a), info);
+    info->types = temp;
+    if (pred) {
+      if (SAME_OBJ(pred, scheme_not_prim)) {
+        x = scheme_false;
+      } else if (context & OPT_CONTEXT_BOOLEAN) {
+        x = scheme_true;
+      } else {
+        if (SAME_OBJ(pred, scheme_null_p_proc))
+          x = scheme_null;
+        if (SAME_OBJ(pred, scheme_void_p_proc))
+          x = scheme_void;
+        if (SAME_OBJ(pred, scheme_eof_object_p_proc))
+          x = scheme_eof;
+      }
+
+      if (SAME_OBJ(x, b))
+        return a;
+    }
+  }
+
+  if (info
+      && SAME_TYPE(SCHEME_TYPE(b), scheme_local_type)
+      && (SCHEME_TYPE(a) > _scheme_compiled_values_types_)) {
+    Scheme_Hash_Tree *temp;
+    Scheme_Object *pred;
+    Scheme_Object *x;
+
+    temp = info->types;
+    info->types = a_types;
+    pred = optimize_get_predicate(SCHEME_LOCAL_POS(b), info);
+    info->types = temp;
+    if (pred) {
+       if (SAME_OBJ(pred, scheme_not_prim)) {
+        x = scheme_false;
+      } else if (context & OPT_CONTEXT_BOOLEAN) {
+        x = scheme_true;
+      } else {
+        if (SAME_OBJ(pred, scheme_null_p_proc))
+          x = scheme_null;
+        if (SAME_OBJ(pred, scheme_void_p_proc))
+          x = scheme_void;
+        if (SAME_OBJ(pred, scheme_eof_object_p_proc))
+          x = scheme_eof;
+      }
+
+      if (SAME_OBJ(x, a))
+        return b;
+    } 
+  }
+
+  return NULL;
 }
 
 static void add_type(Optimize_Info *info, int pos, Scheme_Object *pred)
@@ -4269,11 +4331,13 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   Scheme_Branch_Rec *b;
   Scheme_Object *t, *tb, *fb;
   Scheme_Hash_Tree *init_types, *then_types;
+  Scheme_Hash_Tree *then_init_types, *else_init_types;
   int init_vclock, init_aclock, init_kclock, init_sclock;
   int then_escapes, then_preserves_marks, then_single_result;
   int then_vclock, then_aclock, then_kclock, then_sclock;
   Optimize_Info_Sequence info_seq;
   Scheme_Object *pred;
+  int fff = 0;
 
   b = (Scheme_Branch_Rec *)o;
 
@@ -4308,6 +4372,14 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   if (info->escapes) {
     optimize_info_seq_done(info, &info_seq);
     return t;
+  }
+
+  /* Try optimize: (if <omitable-expr> v v) => v */
+  if (equivalent_exprs(tb, fb, NULL, NULL, NULL, 0)) {
+    printf("[*]");
+    fff = 1;
+    // info->size -= 1; /* could be more precise */
+    // return make_discarding_first_sequence(t, tb, info, 0);
   }
 
   /* Try to lift out `let`s and `begin`s around a test: */
@@ -4358,6 +4430,8 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
       /* Branch is statically known */
       Scheme_Object *xb;
 
+      if (fff)
+        printf("[k]");
       optimize_info_seq_done(info, &info_seq);
       info->size -= 1;
 
@@ -4390,6 +4464,7 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   init_types = info->types;
 
   add_types_for_t_branch(t, info, 5);
+  then_init_types = info->types;
 
   tb = scheme_optimize_expr(tb, info, scheme_optimize_tail_context(context));
 
@@ -4411,6 +4486,7 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   optimize_info_seq_step(info, &info_seq);
 
   add_types_for_f_branch(t, info, 5);
+  else_init_types = info->types;
 
   fb = scheme_optimize_expr(fb, info, scheme_optimize_tail_context(context));
 
@@ -4455,26 +4531,46 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
 
   optimize_info_seq_done(info, &info_seq);
 
+  /* Try optimize: (if x #f #t) => (not x) */
+  if (SCHEME_FALSEP(tb)
+      && SAME_OBJ(fb, scheme_true)) {
+    printf("[x]");
+    info->size -= 2;
+    return make_optimize_prim_application2(scheme_not_prim, t, info, context);
+  }
+
+  /* Try optimize: (if <expr> v v) => (begin <expr> v) */
+  {
+    Scheme_Object *cb;
+
+    cb = equivalent_exprs(tb, fb, NULL, NULL, NULL, 0);
+    if (cb) {
+      printf("[.]");
+     info->size -= 1; /* could be more precise */
+      return make_discarding_first_sequence(t, cb, info, 0);
+    }
+  }
+
+  /* Try optimize: (if <expr> v v) => (begin <expr> v) */
+  {
+    Scheme_Object *cb;
+
+    cb = equivalent_exprs(tb, fb, then_init_types, else_init_types, info, context);
+    if (cb) {
+      printf("[+]");
+     info->size -= 1; /* could be more precise */
+      return make_discarding_first_sequence(t, cb, info, 0);
+    }
+  }
+
   /* Try optimize: (if x x #f) => x */
   if (SAME_TYPE(SCHEME_TYPE(t), scheme_local_type)
       && SAME_TYPE(SCHEME_TYPE(tb), scheme_local_type)
       && (SCHEME_LOCAL_POS(t) == SCHEME_LOCAL_POS(tb))
       && SCHEME_FALSEP(fb)) {
     info->size -= 2;
+    printf("[-]");
     return t;
-  }
-
-  /* Try optimize: (if x #f #t) => (not x) */
-  if (SCHEME_FALSEP(tb)
-      && SAME_OBJ(fb, scheme_true)) {
-    info->size -= 2;
-    return make_optimize_prim_application2(scheme_not_prim, t, info, context);
-  }
-
-  /* Try optimize: (if <omitable-expr> v v) => v */
-  if (equivalent_exprs(tb, fb)) {
-    info->size -= 1; /* could be more precise */
-    return make_discarding_first_sequence(t, tb, info, 0);
   }
 
   /* Convert: (if (if M N #f) M2 K) => (if M (if N M2 K) K)
@@ -5502,7 +5598,10 @@ static void update_rhs_value(Scheme_Compiled_Let_Value *naya, Scheme_Object *e,
                              Optimize_Info *info, Scheme_Object *tst)
 {
   if (tst) {
-    if (!equivalent_exprs(naya->value, e)) {
+    Scheme_Object *c;
+
+    c = equivalent_exprs(naya->value, e, NULL, NULL, NULL, 0); 
+    if (!c) {
       Scheme_Branch_Rec *b;
 
       /* In case `tst` was formerly a single-use variable, mark it as multi-use: */
@@ -5515,7 +5614,8 @@ static void update_rhs_value(Scheme_Compiled_Let_Value *naya, Scheme_Object *e,
       b->fbranch = e;
 
       naya->value = (Scheme_Object *)b;
-    }
+    } else
+      naya->value = c;
   } else
     naya->value = e;
 }

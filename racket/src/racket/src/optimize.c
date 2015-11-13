@@ -1633,7 +1633,7 @@ static Scheme_Object *apply_inlined(Scheme_Object *p, Scheme_Closure_Data *data,
 				    int argc, Scheme_App_Rec *app, Scheme_App2_Rec *app2, Scheme_App3_Rec *app3,
                                     int context,
                                     int nested_count, Scheme_Object *orig, Scheme_Object *le_prev,
-                                    int single_use)
+                                    int single_use, int size, int threshold)
 {
   Scheme_Let_Header *lh;
   Scheme_Compiled_Let_Value *lv, *prev = NULL;
@@ -1716,8 +1716,12 @@ static Scheme_Object *apply_inlined(Scheme_Object *p, Scheme_Closure_Data *data,
     lh->body = p;
 
   sub_info = optimize_info_add_frame(info, 0, 0, 0);
-  if (!single_use)
-    sub_info->inline_fuel >>= 1;
+  if (!single_use && (sub_info->inline_fuel >= 0)) {
+    if (size < (threshold >> 1))
+      sub_info->inline_fuel = (sub_info->inline_fuel >> 1) + (sub_info->inline_fuel >> 2);
+    else
+      sub_info->inline_fuel >>= 1;
+  }
 
   p = scheme_optimize_lets((Scheme_Object *)lh, sub_info, 1, context);
 
@@ -1941,7 +1945,7 @@ Scheme_Object *optimize_for_inline(Optimize_Info *info, Scheme_Object *le, int a
 		     threshold,
 		     scheme_optimize_context_to_string(info->context));
           le = apply_inlined(le, data, sub_info, argc, app, app2, app3, context,
-                             id_offset, orig_le, prev, single_use);
+                             id_offset, orig_le, prev, single_use, sz, threshold);
           if (id_offset) {
             optimize_info_done(sub_info, NULL);
             merge_types(sub_info, info, id_offset);

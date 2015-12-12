@@ -1648,7 +1648,9 @@ static Scheme_Object *apply_inlined(Scheme_Object *p, Scheme_Closure_Data *data,
     sub_info = optimize_info_add_frame(info, 0, 0, 0);
     if (!single_use)
       sub_info->inline_fuel >>= 1;
+    fprintf(stderr, "<%d", sub_info->inline_fuel);
     p = scheme_optimize_expr(p, sub_info, context);
+    fprintf(stderr, "%d>", sub_info->inline_fuel);
     info->single_result = sub_info->single_result;
     info->preserves_marks = sub_info->preserves_marks;
     optimize_info_done(sub_info, NULL);
@@ -1785,6 +1787,7 @@ Scheme_Object *optimize_for_inline(Optimize_Info *info, Scheme_Object *le, int a
   if (SAME_TYPE(SCHEME_TYPE(le), scheme_compiled_unclosed_procedure_type)) {
     /* Found a `((lambda' */
     single_use = 1;
+    fprintf(stderr, "*");
   }
 
   if (SAME_TYPE(SCHEME_TYPE(le), scheme_local_type)) {
@@ -1803,7 +1806,9 @@ Scheme_Object *optimize_for_inline(Optimize_Info *info, Scheme_Object *le, int a
       pos = SCHEME_LOCAL_POS(le);
     }
 
+    fprintf(stderr, "-%d", single_use);
     le = optimize_info_lookup(info, pos - id_offset, &offset, &single_use, 0, 0, &psize, NULL);
+    fprintf(stderr, "%d-", single_use);
     outside_nested = 1;
     already_opt = 1;
   }
@@ -1918,6 +1923,8 @@ Scheme_Object *optimize_for_inline(Optimize_Info *info, Scheme_Object *le, int a
       /* Do we have enough fuel? */
       if ((sz >= 0) && (single_use || (sz <= threshold))) {
         Optimize_Info *sub_info;
+        fprintf(stderr, "{%d,%d,%d,%d}", sz, threshold, single_use, info->inline_fuel);
+        fprintf(stderr, "-%d-", info->inline_fuel);
         if (id_offset) {
           sub_info = optimize_info_add_frame(info, id_offset, id_offset, 0);
           /* We only go into `let` and `begin` only for an optimized rator, so
@@ -1944,12 +1951,16 @@ Scheme_Object *optimize_for_inline(Optimize_Info *info, Scheme_Object *le, int a
 		     sz,
 		     threshold,
 		     scheme_optimize_context_to_string(info->context));
+          fprintf(stderr, "_%d_", sub_info->inline_fuel);
           le = apply_inlined(le, data, sub_info, argc, app, app2, app3, context,
                              id_offset, orig_le, prev, single_use, sz, threshold);
+          fprintf(stderr, "_%d_", sub_info->inline_fuel);
           if (id_offset) {
             optimize_info_done(sub_info, NULL);
             merge_types(sub_info, info, id_offset);
           }
+          fprintf(stderr, "_%d_", sub_info->inline_fuel);
+          fprintf(stderr, "-%d-", info->inline_fuel);
           return le;
 	} else {
           LOG_INLINE(fprintf(stderr, "No inline %s\n", scheme_write_to_string(data->name ? data->name : scheme_false, NULL)));
@@ -2771,7 +2782,9 @@ static Scheme_Object *optimize_application(Scheme_Object *o, Optimize_Info *info
   for (i = 0; i < n; i++) {
     if (!i) {
       le = optimize_for_inline(info, app->args[i], n - 1, app, NULL, NULL, &rator_flags, context, 0, 0);
-      if (le)
+      if (le) 
+        fprintf(stderr, "[!%d]", n);
+       if (le)
         return le;
     }
 
@@ -2808,8 +2821,10 @@ static Scheme_Object *optimize_application(Scheme_Object *o, Optimize_Info *info
     if (!i) {
       /* Maybe found "((lambda" after optimizing; try again */
       le = optimize_for_inline(info, app->args[i], n - 1, app, NULL, NULL, &rator_flags, context, 1, 0);
-      if (le)
-        return le;
+      if (le) 
+        fprintf(stderr, "(%d)", n);
+      // if (le)
+      //   return le;
       if (SAME_OBJ(app->args[0], scheme_values_func)
           || SAME_OBJ(app->args[0], scheme_apply_proc))
         info->maybe_values_argument = 1;
@@ -6138,7 +6153,7 @@ scheme_optimize_lets(Scheme_Object *form, Optimize_Info *info, int for_inline, i
         && IS_COMPILED_PROC(pre_body->value)) {
       inline_fuel = rhs_info->inline_fuel;
       if (inline_fuel > 2)
-        rhs_info->inline_fuel = 2;
+        rhs_info->inline_fuel = 7;
       rhs_info->letrec_not_twice++;
       undiscourage = 1;
     } else {
@@ -7445,7 +7460,7 @@ module_optimize(Scheme_Object *data, Optimize_Info *info, int context)
       info->use_psize = 1;
       inline_fuel = info->inline_fuel;
       if (inline_fuel > 2)
-        info->inline_fuel = 2;
+        info->inline_fuel = 9;
     } else
       inline_fuel = 0;
     optimize_info_seq_step(info, &info_seq);

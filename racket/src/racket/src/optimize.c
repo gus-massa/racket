@@ -1959,7 +1959,7 @@ Scheme_Object *optimize_for_inline(Optimize_Info *info, Scheme_Object *le, int a
                              id_offset, orig_le, prev);
           if (id_offset) {
             optimize_info_done(sub_info, NULL);
-            merge_types(sub_info, info, id_offset);
+            merge_types(sub_info, info, -id_offset);
           }
           return le;
 	} else {

@@ -79,6 +79,7 @@ READ_ONLY Scheme_Object scheme_void[1]; /* the void constant */
 READ_ONLY Scheme_Object *scheme_values_func; /* the function bound to `values' */
 READ_ONLY Scheme_Object *scheme_procedure_p_proc;
 READ_ONLY Scheme_Object *scheme_procedure_arity_includes_proc;
+READ_ONLY Scheme_Object *scheme_procedure_rename_proc;
 READ_ONLY Scheme_Object *scheme_procedure_specialize_proc;
 READ_ONLY Scheme_Object *scheme_void_proc;
 READ_ONLY Scheme_Object *scheme_void_p_proc;
@@ -583,11 +584,14 @@ scheme_init_fun (Scheme_Env *env)
 						      "procedure-reduce-arity",
 						      2, 2),
 			     env);
-  scheme_add_global_constant("procedure-rename",
-			     scheme_make_prim_w_arity(procedure_rename,
-						      "procedure-rename",
-						      2, 2),
-			     env);
+
+  REGISTER_SO(scheme_procedure_rename_proc);
+  o = scheme_make_prim_w_arity(procedure_rename,
+                               "procedure-rename",
+                               2, 2);
+  scheme_procedure_rename_proc = o;
+  scheme_add_global_constant("procedure-rename", o, env);
+
   scheme_add_global_constant("procedure->method",
 			     scheme_make_prim_w_arity(procedure_to_method,
 						      "procedure->method",

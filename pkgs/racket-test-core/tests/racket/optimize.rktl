@@ -1707,9 +1707,18 @@
 	   '(letrec ([x (cons 1 1)][y x]) (cons x x)))
 
 (test-comp '(let ([f (lambda (x) x)]) f)
-	   (syntax-property (datum->syntax #f '(lambda (x) x) (vector 'here #f #f #f #f))
+           (syntax-property (datum->syntax #f '(lambda (x) x) (vector 'here #f #f #f #f))
                             'inferred-name
                             'f))
+(test-comp '(let ([f (case-lambda [() 0] [(x) 1])]) f)
+           (syntax-property (datum->syntax #f '(case-lambda [() 0] [(x) 1]) (vector 'here #f #f #f #f))
+                            'inferred-name
+                            'f))
+(require (only-in '#%kernel (procedure-rename kernel:procedure-rename)))
+(test-comp '(let ([f (lambda (x) x)]) f)
+           '(kernel:procedure-rename (lambda (x) x) 'f))
+#;(test-comp '(let ([f (case-lambda [() 0] [(x) 1])]) f)
+           '(kernel:procedure-rename (case-lambda [() 0] [(x) 1]) 'f))
 
 (test-comp '(letrec ([f (lambda (x) x)])
 	      (f 10)

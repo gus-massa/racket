@@ -3861,6 +3861,44 @@ static Scheme_Object *finish_optimize_application3(Scheme_App3_Rec *app, Optimiz
         return make_optimize_prim_application2(scheme_null_p_proc, app->rand1, info, context);
       }
     }
+  } else if (SCHEME_PRIMP(app->rator)) {
+    if (SAME_OBJ(app->rator, scheme_procedure_rename_proc)) {
+      /* Try optimize: (procedure-rename (lambda () 'old-name ...) 'new-name) => (lambda () 'new-name ...) */
+      if (SCHEME_SYMBOLP(app->rand2)) {
+        if (SAME_TYPE(SCHEME_TYPE(app->rand1), scheme_compiled_unclosed_procedure_type)) {
+          Scheme_Closure_Data *data = (Scheme_Closure_Data *)app->rand1;
+          Scheme_Object *name = data->name;
+
+          if (name && SCHEME_VECTORP(name))
+            SCHEME_VEC_ELS(name)[0] = app->rand2;
+          else
+            data->name = app->rand2;
+
+          return app->rand1;
+        } else if (SAME_TYPE(SCHEME_TYPE(app->rand1), scheme_case_lambda_sequence_type)) {
+          Scheme_Case_Lambda *cl = (Scheme_Case_Lambda *)app->rand1;
+          Scheme_Object *name = cl->name;
+          int i;
+
+          if (name && SCHEME_VECTORP(name))
+            SCHEME_VEC_ELS(name)[0] = app->rand2;
+          else
+            cl->name = app->rand2;
+
+          for (i = cl->count; i--; ) {
+            Scheme_Closure_Data *data2 = (Scheme_Closure_Data *)cl->array[i];
+            Scheme_Object *name2 = data2->name;
+
+            if (name2 && SCHEME_VECTORP(name2))
+              SCHEME_VEC_ELS(name2)[0] = app->rand2;
+            else
+              data2->name = app->rand2;
+          }
+
+          return app->rand1;
+        }
+      }
+    }
   }
 
   if (SCHEME_PRIMP(app->rator)) {

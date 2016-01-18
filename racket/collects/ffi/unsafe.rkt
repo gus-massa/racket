@@ -1576,12 +1576,13 @@
                              (lambda (p)
                                (if p (set-cpointer-tag! p all-tags) (c->s p))
                                p)))))
-            (define-values (all-types all-offsets)
-              (if (and has-super? super-types super-offsets)
-                  (values (append super-types   (cdr types))
-                          (append super-offsets (cdr offsets)))
-                  (values types offsets)))
-            
+            (define-values (all-types) (if (and has-super? super-types super-offsets)
+                                           (append super-types (cdr types))
+                                           types))
+            (define-values (all-offsets) (if (and has-super? super-types super-offsets)
+                                             (append super-types (cdr offsets))
+                                             offsets))
+
             (begin
               (define (unsafe-TYPE-SLOT x)
                 (ptr-ref x stype 'abs offset))

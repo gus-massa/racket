@@ -204,6 +204,7 @@
                 [(rb ...) (generate-temporaries (or rngs '()))]
                 [(arg-x ...) (generate-temporaries regular-args)]
                 [(res-x ...) (generate-temporaries (or rngs '()))]
+                [res-len (cond [(list? rngs) (length rngs)] [rngs 1] [else 0])]
                 [(kwd-arg-x ...) (generate-temporaries mandatory-kwds)])
 
     (define base-arg-expressions (reverse (syntax->list #'((regb arg-x neg-party) ...))))
@@ -286,31 +287,41 @@
                        #`[#,the-args
                           (let ([blame+neg-party (cons blame neg-party)])
                             pre-check ...
-                            (define-values (failed res-x ...)
-                              (call-with-values
-                               (λ () (let-values (#,let-values-clause)
-                                       #,full-call))
-                               (case-lambda
-                                 [(res-x ...)
-                                  (values #f res-x ...)]
-                                 [args
-                                  (values args #,@(map (λ (x) #'#f) 
-                                                       (syntax->list #'(res-x ...))))])))
-                            (with-contract-continuation-mark
-                              blame+neg-party
+                            (let ([res-arity (procedure-result-arity f)])
                               (cond
-                                [failed
-                                 (wrong-number-of-results-blame
-                                  blame neg-party f
-                                  failed
-                                  #,(length
-                                     (syntax->list
-                                      #'(res-x ...))))]
-                                [else
-                                 post-check ...
-                                 (values
-                                  (rb res-x neg-party)
-                                  ...)])))]
+                                [(and res-arity (= res-arity res-len))
+                                 (let-values ([(res-x ...) (let-values (#,let-values-clause)
+                                                             #,full-call)])
+                                   post-check ...
+                                   (values
+                                     (rb res-x neg-party)
+                                     ...))]
+                               [else
+                                 (define-values (failed res-x ...)
+                                   (call-with-values
+                                    (λ () (let-values (#,let-values-clause)
+                                            #,full-call))
+                                    (case-lambda
+                                      [(res-x ...)
+                                       (values #f res-x ...)]
+                                      [args
+                                       (values args #,@(map (λ (x) #'#f) 
+                                                            (syntax->list #'(res-x ...))))])))
+                                 (with-contract-continuation-mark
+                                   blame+neg-party
+                                   (cond
+                                     [failed
+                                      (wrong-number-of-results-blame
+                                       blame neg-party f
+                                       failed
+                                       #,(length
+                                          (syntax->list
+                                           #'(res-x ...))))]
+                                     [else
+                                      post-check ...
+                                      (values
+                                       (rb res-x neg-party)
+                                       ...)]))])))]
                        #`[#,the-args
                           pre-check ...
                           (let ([blame+neg-party (cons blame neg-party)])

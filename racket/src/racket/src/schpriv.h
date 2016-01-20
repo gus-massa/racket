@@ -458,6 +458,7 @@ extern Scheme_Object *scheme_procedure_p_proc;
 extern Scheme_Object *scheme_procedure_arity_includes_proc;
 extern Scheme_Object *scheme_procedure_specialize_proc;
 extern Scheme_Object *scheme_primitive_result_arity_proc;
+extern Scheme_Object *scheme_procedure_result_arity_proc;
 extern Scheme_Object *scheme_void_proc;
 extern Scheme_Object *scheme_void_p_proc;
 extern Scheme_Object *scheme_syntax_p_proc;
@@ -4235,6 +4236,7 @@ Scheme_Object *scheme_checked_flimag_part (int argc, Scheme_Object *argv[]);
 Scheme_Object *scheme_checked_make_flrectangular (int argc, Scheme_Object *argv[]);
 Scheme_Object *scheme_procedure_arity_includes(int argc, Scheme_Object *argv[]);
 Scheme_Object *scheme_primitive_result_arity(int argc, Scheme_Object *argv[]);
+Scheme_Object *scheme_procedure_result_arity(int argc, Scheme_Object *argv[]);
 Scheme_Object *scheme_checked_char_to_integer (int argc, Scheme_Object *argv[]);
 Scheme_Object *scheme_checked_integer_to_char (int argc, Scheme_Object *argv[]);
 

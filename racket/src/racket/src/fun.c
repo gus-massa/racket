@@ -191,7 +191,6 @@ static Scheme_Object *chaperone_procedure_star(int argc, Scheme_Object *argv[]);
 static Scheme_Object *impersonate_procedure_star(int argc, Scheme_Object *argv[]);
 static Scheme_Object *primitive_p(int argc, Scheme_Object *argv[]);
 static Scheme_Object *primitive_closure_p(int argc, Scheme_Object *argv[]);
-static Scheme_Object *procedure_result_arity (int argc, Scheme_Object *argv[]);
 static Scheme_Object *call_with_values(int argc, Scheme_Object *argv[]);
 Scheme_Object *scheme_values(int argc, Scheme_Object *argv[]);
 static Scheme_Object *current_print(int argc, Scheme_Object **argv);
@@ -647,11 +646,12 @@ scheme_init_fun (Scheme_Env *env)
   SCHEME_PRIM_PROC_FLAGS(o) |= scheme_intern_prim_opt_flags(SCHEME_PRIM_IS_UNARY_INLINED);
   scheme_add_global_constant("primitive-result-arity", o, env);
 
-  scheme_add_global_constant("procedure-result-arity",
-                             scheme_make_folding_prim(procedure_result_arity,
-                                                      "procedure-result-arity",
-                                                      1, 1, 1),
-                             env);
+  REGISTER_SO(scheme_procedure_result_arity_proc);
+  o = scheme_make_folding_prim(scheme_procedure_result_arity,
+                               "procedure-result-arity",
+                               1, 1, 1);
+//  SCHEME_PRIM_PROC_FLAGS(o) |= scheme_intern_prim_opt_flags(SCHEME_PRIM_IS_UNARY_INLINED);
+  scheme_add_global_constant("procedure-result-arity", o, env);
 
   scheme_add_global_constant("current-print",
 			     scheme_register_parameter(current_print,
@@ -2902,7 +2902,7 @@ Scheme_Object *scheme_primitive_result_arity(int argc, Scheme_Object *argv[])
   return scheme_make_integer(1);
 }
 
-static Scheme_Object *procedure_result_arity(int argc, Scheme_Object *argv[])
+Scheme_Object *scheme_procedure_result_arity(int argc, Scheme_Object *argv[])
 {
   Scheme_Object *o, *orig_o;
 

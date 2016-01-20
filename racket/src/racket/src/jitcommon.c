@@ -3289,6 +3289,63 @@ static int common10(mz_jit_state *jitter, void *_data)
     CHECK_LIMIT();
   }
 
+  /* proc_result_arity_code */
+  /* R0 has primitive */
+  {
+    GC_CAN_IGNORE jit_insn *ref_nofx, *ref_slow, *ref_multiple;
+    GC_CAN_IGNORE jit_insn *refr USED_ONLY_FOR_FUTURES;
+    
+    sjc.proc_result_arity_code = jit_get_ip();
+    mz_prolog(JIT_R2);
+
+    __START_SHORT_JUMPS__(1);
+    ref_nofx = jit_bmci_l(jit_forward(), JIT_R0, 0x1);
+
+    ref_slow= jit_get_ip();
+    jit_subi_p(JIT_RUNSTACK, JIT_RUNSTACK, WORDS_TO_BYTES(1));
+    JIT_UPDATE_THREAD_RSPTR();
+    jit_str_p(JIT_RUNSTACK, JIT_R0);
+    CHECK_LIMIT();
+    jit_movi_i(JIT_R0, 2);
+    mz_prepare(1);
+    jit_pusharg_p(JIT_RUNSTACK);
+    jit_pusharg_i(JIT_R0);
+    __END_SHORT_JUMPS__(1);
+    mz_finish_prim_lwe(ts_scheme_procedure_result_arity, refr);
+    __START_SHORT_JUMPS__(1);
+    jit_retval(JIT_R0);
+    jit_addi_p(JIT_RUNSTACK, JIT_RUNSTACK, WORDS_TO_BYTES(1));
+    JIT_UPDATE_THREAD_RSPTR();
+    CHECK_LIMIT();
+    mz_epilog(JIT_R2);
+    
+    mz_patch_branch(ref_nofx);
+    jit_ldxi_s(JIT_R2, JIT_R0, &((Scheme_Object *)0x0)->type);
+    (void)jit_bnei_i(ref_slow, JIT_R2, scheme_prim_type);
+    jit_ldxi_s(JIT_R2, JIT_R0, &((Scheme_Primitive_Proc *)0x0)->pp.flags);
+    (void)jit_bmci_i(ref_slow, JIT_R2, SCHEME_PRIM_IS_PRIMITIVE);
+    CHECK_LIMIT();
+
+    (void)jit_bmsi_i(ref_multiple, JIT_R2, SCHEME_PRIM_IS_MULTI_RESULT);
+    (void)jit_movi_p(JIT_R0, scheme_make_integer(1));
+    CHECK_LIMIT();
+    mz_epilog(JIT_R2);
+
+    mz_patch_branch(ref_multiple);
+    jit_ldxi_i(JIT_R2, JIT_R0, &((Scheme_Prim_W_Result_Arity *)0x0)->minr);
+    jit_ldxi_i(JIT_R1, JIT_R0, &((Scheme_Prim_W_Result_Arity *)0x0)->maxr);
+    (void)jit_bner_i(ref_slow, JIT_R2, JIT_R1);
+    CHECK_LIMIT();
+
+    (void)jit_fixnum_l(JIT_R0, JIT_R2);
+    mz_epilog(JIT_R2);
+
+    __END_SHORT_JUMPS__(1);
+
+    scheme_jit_register_sub_func(jitter, sjc.proc_result_arity_code, scheme_false);
+    CHECK_LIMIT();
+  }
+
   return 1;
 }
 

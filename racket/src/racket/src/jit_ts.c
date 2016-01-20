@@ -99,6 +99,7 @@ define_ts_sis_v(scheme_struct_set, FSRC_MARKS)
 define_ts_iS_s(scheme_extract_checked_procedure, FSRC_MARKS)
 define_ts_iS_s(scheme_procedure_arity_includes, FSRC_MARKS)
 define_ts_iS_s(scheme_primitive_result_arity, FSRC_MARKS)
+define_ts_iS_s(scheme_procedure_result_arity, FSRC_MARKS)
 define_ts_ssi_s(vector_check_chaperone_of, FSRC_MARKS)
 define_ts_iS_s(scheme_checked_list_ref, FSRC_MARKS)
 define_ts_iS_s(scheme_checked_list_tail, FSRC_MARKS)
@@ -246,6 +247,7 @@ define_ts_s_s(scheme_box, FSRC_OTHER)
 # define ts_scheme_extract_checked_procedure scheme_extract_checked_procedure
 # define ts_scheme_procedure_arity_includes scheme_procedure_arity_includes
 # define ts_scheme_primitive_result_arity scheme_primitive_result_arity
+# define ts_scheme_procedure_result_arity scheme_procedure_result_arity
 # define ts_apply_checked_fail apply_checked_fail
 # define ts_scheme_build_list_offset scheme_build_list_offset
 # define ts_wrong_argument_count wrong_argument_count

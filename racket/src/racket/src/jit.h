@@ -361,6 +361,7 @@ struct scheme_jit_common_record {
   void *bad_bytes_eq_2_code;
   void *proc_arity_includes_code;
   void *prim_result_arity_code;
+  void *proc_result_arity_code;
 
 #ifdef CAN_INLINE_ALLOC
   void *make_list_code, *make_list_star_code;

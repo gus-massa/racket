@@ -2058,6 +2058,16 @@ int scheme_generate_inlined_unary(mz_jit_state *jitter, Scheme_App2_Rec *app, in
       mz_popr_x(); /* remove arg */
 
       return 1;
+    } else if (IS_NAMED_PRIM(rator, "primitive-result-arity")) {
+      mz_runstack_skipped(jitter, 1);
+      scheme_generate_non_tail(app->rand, jitter, 0, 1, 0);
+      CHECK_LIMIT();
+
+      mz_rs_sync();
+      (void)jit_calli(sjc.prim_result_arity_code);
+      jit_movr_p(dest, JIT_R0);
+
+      return 1;
     }
   }
 

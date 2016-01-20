@@ -80,6 +80,8 @@ READ_ONLY Scheme_Object *scheme_values_func; /* the function bound to `values' *
 READ_ONLY Scheme_Object *scheme_procedure_p_proc;
 READ_ONLY Scheme_Object *scheme_procedure_arity_includes_proc;
 READ_ONLY Scheme_Object *scheme_procedure_specialize_proc;
+READ_ONLY Scheme_Object *scheme_primitive_result_arity_proc;
+READ_ONLY Scheme_Object *scheme_procedure_result_arity_proc;
 READ_ONLY Scheme_Object *scheme_void_proc;
 READ_ONLY Scheme_Object *scheme_void_p_proc;
 READ_ONLY Scheme_Object *scheme_check_not_undefined_proc;
@@ -189,7 +191,6 @@ static Scheme_Object *chaperone_procedure_star(int argc, Scheme_Object *argv[]);
 static Scheme_Object *impersonate_procedure_star(int argc, Scheme_Object *argv[]);
 static Scheme_Object *primitive_p(int argc, Scheme_Object *argv[]);
 static Scheme_Object *primitive_closure_p(int argc, Scheme_Object *argv[]);
-static Scheme_Object *primitive_result_arity (int argc, Scheme_Object *argv[]);
 static Scheme_Object *procedure_result_arity (int argc, Scheme_Object *argv[]);
 static Scheme_Object *call_with_values(int argc, Scheme_Object *argv[]);
 Scheme_Object *scheme_values(int argc, Scheme_Object *argv[]);
@@ -638,11 +639,13 @@ scheme_init_fun (Scheme_Env *env)
 						      1, 1, 1),
 			     env);
 
-  scheme_add_global_constant("primitive-result-arity",
-			     scheme_make_folding_prim(primitive_result_arity,
-						      "primitive-result-arity",
-						      1, 1, 1),
-			     env);
+  REGISTER_SO(scheme_primitive_result_arity_proc);
+  o = scheme_make_folding_prim(scheme_primitive_result_arity,
+                               "primitive-result-arity",
+                               1, 1, 1);
+  scheme_primitive_result_arity_proc = o;
+  SCHEME_PRIM_PROC_FLAGS(o) |= scheme_intern_prim_opt_flags(SCHEME_PRIM_IS_UNARY_INLINED);
+  scheme_add_global_constant("primitive-result-arity", o, env);
 
   scheme_add_global_constant("procedure-result-arity",
                              scheme_make_folding_prim(procedure_result_arity,
@@ -2874,7 +2877,7 @@ const char *scheme_get_proc_name(Scheme_Object *p, int *len, int for_error)
   return s;
 }
 
-static Scheme_Object *primitive_result_arity(int argc, Scheme_Object *argv[])
+Scheme_Object *scheme_primitive_result_arity(int argc, Scheme_Object *argv[])
 {
   Scheme_Object *o;
 

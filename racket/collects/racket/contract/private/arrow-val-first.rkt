@@ -286,6 +286,7 @@
                        #`[#,the-args
                           (let ([blame+neg-party (cons blame neg-party)])
                             pre-check ...
+                            (display (list "*" (procedure-result-arity f)))
                             (define-values (failed res-x ...)
                               (call-with-values
                                (λ () (let-values (#,let-values-clause)

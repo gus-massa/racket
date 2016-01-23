@@ -47,6 +47,32 @@
     [(_ (any/c ...) () any) (length (syntax->list (cadr (syntax->list stx))))]
     [_ #f]))
 
+(define-syntax (call-with-values/checked-range stx)
+  (syntax-protect
+    (syntax-case stx (case-lambda)
+      [(_
+        thunk
+        (case-lambda
+          [(res-x ...) success ...]
+          [failed/args failure ...]))
+       (and (identifier? #'failed/args)
+            (andmap identifier? (syntax-e #'(res-x ...))))
+       (quasisyntax/loc
+        stx
+        (let ()
+          (define-values (failed/args res-x ...)
+          (call-with-values
+            thunk
+            (case-lambda
+              [(res-x ...)
+               (values #f res-x ...)]
+              [failed/args
+               (values failed/args #,@(map (λ (x) #'#f) 
+                                           (syntax->list #'(res-x ...))))])))
+          (cond
+            [failed/args failure ...]
+            [else success ...])))])))
+
 (define-for-syntax popular-keys
   ;; of the 8417 contracts that get compiled during
   ;; 'raco setup' of the current tree, these are all
@@ -287,31 +313,26 @@
                           (let ([blame+neg-party (cons blame neg-party)])
                             pre-check ...
                             (display (list "*" (procedure-result-arity f)))
-                            (define-values (failed res-x ...)
-                              (call-with-values
-                               (λ () (let-values (#,let-values-clause)
+                            (call-with-values/checked-range
+                              (λ () (let-values (#,let-values-clause)
                                        #,full-call))
-                               (case-lambda
-                                 [(res-x ...)
-                                  (values #f res-x ...)]
-                                 [args
-                                  (values args #,@(map (λ (x) #'#f) 
-                                                       (syntax->list #'(res-x ...))))])))
-                            (with-contract-continuation-mark
-                              blame+neg-party
-                              (cond
-                                [failed
-                                 (wrong-number-of-results-blame
-                                  blame neg-party f
-                                  failed
-                                  #,(length
-                                     (syntax->list
-                                      #'(res-x ...))))]
-                                [else
-                                 post-check ...
-                                 (values
-                                  (rb res-x neg-party)
-                                  ...)])))]
+                              (case-lambda
+                                [(res-x ...)
+                                  (with-contract-continuation-mark
+                                   blame+neg-party
+                                   post-check ...
+                                   (values
+                                   (rb res-x neg-party)
+                                   ...))]
+                                [args
+                                  (with-contract-continuation-mark
+                                     blame+neg-party
+                                     (wrong-number-of-results-blame
+                                      blame neg-party f
+                                      args
+                                      #,(length
+                                         (syntax->list
+                                          #'(res-x ...)))))])))]
                        #`[#,the-args
                           pre-check ...
                           (let ([blame+neg-party (cons blame neg-party)])
@@ -1270,7 +1291,7 @@
              #f
              (λ (blame f _ignored-rng-ctcs _ignored-rng-proj)
                (λ (neg-party)
-                 (call-with-values
+                 (call-with-values/checked-range
                   (λ () (f))
                   (case-lambda
                     [(rng)
@@ -1299,9 +1320,17 @@
                #f
                (λ (blame f _ignored-dom-contract _ignored-rng-contract)
                  (λ (neg-party argument)
-                   (call-with-values
+                   (call-with-values/checked-range
                     (λ () (f argument))
-                    (rng-checker f blame neg-party))))
+                    (case-lambda
+                      [(rng)
+                       (if (boolean? rng)
+                       rng
+                       (raise-blame-error blame #:missing-party neg-party rng
+                                                '(expected: "boolean?" given: "~e")
+                                                rng))]
+                      [args
+                       (wrong-number-of-results-blame blame neg-party f args 1)]))))
                (λ (blame f neg-party
                          _ignored-blame-party-info
                          _ignored-rng-ctcs

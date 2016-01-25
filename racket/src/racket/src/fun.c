@@ -650,7 +650,8 @@ scheme_init_fun (Scheme_Env *env)
   o = scheme_make_folding_prim(scheme_procedure_result_arity,
                                "procedure-result-arity",
                                1, 1, 1);
-//  SCHEME_PRIM_PROC_FLAGS(o) |= scheme_intern_prim_opt_flags(SCHEME_PRIM_IS_UNARY_INLINED);
+  scheme_procedure_result_arity_proc = o;
+  SCHEME_PRIM_PROC_FLAGS(o) |= scheme_intern_prim_opt_flags(SCHEME_PRIM_IS_UNARY_INLINED);
   scheme_add_global_constant("procedure-result-arity", o, env);
 
   scheme_add_global_constant("current-print",

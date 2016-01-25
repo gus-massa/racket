@@ -3290,24 +3290,26 @@ static int common10(mz_jit_state *jitter, void *_data)
   }
 
   /* proc_result_arity_code */
-  /* R0 has primitive */
+  /* R0 has procedure */
   {
-    GC_CAN_IGNORE jit_insn *ref_nofx, *ref_slow, *ref_multiple;
+    GC_CAN_IGNORE jit_insn *ref_nofx, *ref_slow, *ref_false;
+    GC_CAN_IGNORE jit_insn *ref_nat, *ref_notjit;
+    GC_CAN_IGNORE jit_insn *ref_prim, *ref_multiple;
     GC_CAN_IGNORE jit_insn *refr USED_ONLY_FOR_FUTURES;
     
     sjc.proc_result_arity_code = jit_get_ip();
     mz_prolog(JIT_R2);
 
     __START_SHORT_JUMPS__(1);
-    ref_nofx = jit_bmci_l(jit_forward(), JIT_R0, 0x1);
+//    ref_nofx = jit_bmci_l(jit_forward(), JIT_R0, 0x1);
 
     ref_slow= jit_get_ip();
     jit_subi_p(JIT_RUNSTACK, JIT_RUNSTACK, WORDS_TO_BYTES(1));
     JIT_UPDATE_THREAD_RSPTR();
     jit_str_p(JIT_RUNSTACK, JIT_R0);
     CHECK_LIMIT();
-    jit_movi_i(JIT_R0, 2);
-    mz_prepare(1);
+    jit_movi_i(JIT_R0, 1);
+    mz_prepare(2);
     jit_pusharg_p(JIT_RUNSTACK);
     jit_pusharg_i(JIT_R0);
     __END_SHORT_JUMPS__(1);
@@ -3319,15 +3321,57 @@ static int common10(mz_jit_state *jitter, void *_data)
     CHECK_LIMIT();
     mz_epilog(JIT_R2);
     
-    mz_patch_branch(ref_nofx);
+    /* false: */
+    ref_false = jit_get_ip();
+    (void)jit_movi_p(JIT_R0, scheme_false);
+    mz_epilog(JIT_R2);
+
+    /* no fixnum: */
+//    mz_patch_branch(ref_nofx);
     jit_ldxi_s(JIT_R2, JIT_R0, &((Scheme_Object *)0x0)->type);
-    (void)jit_bnei_i(ref_slow, JIT_R2, scheme_prim_type);
-    jit_ldxi_s(JIT_R2, JIT_R0, &((Scheme_Primitive_Proc *)0x0)->pp.flags);
-    (void)jit_bmci_i(ref_slow, JIT_R2, SCHEME_PRIM_IS_PRIMITIVE);
+    ref_nat = jit_beqi_i(ref_slow, JIT_R2, scheme_native_closure_type);
+    ref_prim = jit_beqi_i(ref_slow, JIT_R2, scheme_prim_type);
+
+    (void)jit_jmpi(ref_slow);
     CHECK_LIMIT();
 
+    /* native: */
+//    mz_patch_branch(ref_nat);
+    jit_ldxi_p(JIT_V1, JIT_R0, &((Scheme_Native_Closure *)0x0)->code);
+    jit_ldxi_i(JIT_R2, JIT_V1, &((Scheme_Native_Closure_Data *)0x0)->closure_size);
+    (void)jit_blti_i(ref_slow, JIT_R2, 0); /* case lambda */
+
+    jit_ldxi_p(JIT_R2, JIT_V1, &((Scheme_Native_Closure_Data *)0x0)->start_code);
+    /* patchable_movi_p doesn't depend on actual address, which might change size: */
+    (void)jit_patchable_movi_p(JIT_V1, scheme_on_demand_jit_code);
+    ref_notjit = jit_beqr_p(jit_forward(), JIT_R2, JIT_V1); /* not yet JITted? */
+    CHECK_LIMIT();
+
+    /* JITted native: */
+    jit_ldxi_p(JIT_V1, JIT_R0, &((Scheme_Native_Closure *)0x0)->code);
+    jit_ldxi_s(JIT_V1, JIT_V1, &SCHEME_NATIVE_CLOSURE_DATA_FLAGS(((Scheme_Closure_Data *)0x0)));
+    (void)jit_bmci_i(ref_false, JIT_V1, NATIVE_IS_SINGLE_RESULT);
+    (void)jit_movi_i(JIT_R0, scheme_make_integer(1));
+    mz_epilog(JIT_R2);
+    CHECK_LIMIT();
+
+    /* not-yet-JITted native: */
+    mz_patch_branch(ref_notjit);
+    jit_ldxi_p(JIT_V1, JIT_R0, &((Scheme_Native_Closure *)0x0)->code);
+    jit_ldxi_p(JIT_V1, JIT_V1, &((Scheme_Native_Closure_Data *)0x0)->u2.orig_code);
+    jit_ldxi_s(JIT_V1, JIT_V1, &SCHEME_CLOSURE_DATA_FLAGS(((Scheme_Closure_Data *)0x0)));
+    (void)jit_bmci_i(ref_false, JIT_V1, CLOS_SINGLE_RESULT);
+    (void)jit_movi_i(JIT_R0, scheme_make_integer(1));
+    mz_epilog(JIT_R2);
+    CHECK_LIMIT();
+
+
+
+
+    /* primitive: */
+//    mz_patch_branch(ref_prim);
     (void)jit_bmsi_i(ref_multiple, JIT_R2, SCHEME_PRIM_IS_MULTI_RESULT);
-    (void)jit_movi_p(JIT_R0, scheme_make_integer(1));
+    (void)jit_movi_i(JIT_R0, scheme_make_integer(1));
     CHECK_LIMIT();
     mz_epilog(JIT_R2);
 

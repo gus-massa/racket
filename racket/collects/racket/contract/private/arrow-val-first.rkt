@@ -238,12 +238,21 @@
                          (list #`(check-post-cond #,post blame neg-party f))
                          (list))]
                     [(restb) (generate-temporaries '(rest-args))])
+        (define simple-args (or (and (null? optional-args)
+                                     (null? optional-kwds))
+                                (and (null? mandatory-kwds)
+                                     (null? optional-kwds))))
+        (define define-res-arity
+          (cond
+            [(and simple-args rngs)
+             #`((define res-arity (procedure-result-arity f))
+                (define avoid-res-arity-check (and res-arity #f
+                                                   (= res-arity #,(length (syntax->list #'(res-x ...)))))))]
+            [else
+             #'()]))
         (define body-proc
           (cond
-            [(or (and (null? optional-args)
-                      (null? optional-kwds))
-                 (and (null? mandatory-kwds)
-                      (null? optional-kwds)))
+            [simple-args
              (define case-lambda-clauses
                (let loop ([optional-args (reverse optional-args)]
                           [ob (reverse (syntax->list #'(optb ...)))]
@@ -290,12 +299,17 @@
                               (call-with-values
                                (λ () (let-values (#,let-values-clause)
                                        #,full-call))
-                               (case-lambda
-                                 [(res-x ...)
-                                  (values #f res-x ...)]
-                                 [args
-                                  (values args #,@(map (λ (x) #'#f) 
-                                                       (syntax->list #'(res-x ...))))])))
+                               (cond 
+                                 [avoid-res-arity-check
+                                  (lambda (res-x ...)
+                                    (values #f res-x ...))]
+                                 [else
+                                  (case-lambda
+                                    [(res-x ...)
+                                     (values #f res-x ...)]
+                                    [args
+                                     (values args #,@(map (λ (x) #'#f) 
+                                                          (syntax->list #'(res-x ...))))])])))
                             (with-contract-continuation-mark
                               blame+neg-party
                               (cond
@@ -340,6 +354,7 @@
                                    #,(if post post #'#f)
                                    #,(if rngs #'(list rb ...) #'#f))]))
         #`(λ (blame f regb ... optb ... kb ... okb ... rb ... #,@(if rest (list #'restb) '()))
+            #,@define-res-arity
             (procedure-specialize
              #,body-proc))))))
 

@@ -4289,15 +4289,25 @@ Scheme_Object *unsafe_scheme_hash_tree_iterate_next(int argc, Scheme_Object *arg
 
   /* return scheme_hash_tree_next_no_check((Scheme_Hash_Tree *)o,  */
   /* 					SCHEME_INT_VAL(argv[1])); */
-  return scheme_unsafe_hash_tree_next(argv[1]);
+  return scheme_unsafe_hash_tree_next((Scheme_Hash_Tree *)o, argv[1]);
 }
 Scheme_Object *unsafe_scheme_hash_tree_iterate_key(int argc, Scheme_Object *argv[])
 {
-  Scheme_Object *obj = argv[0], *args = argv[1], *key;
-  Scheme_Hash_Tree *subtree = (Scheme_Hash_Tree *)SCHEME_CAR(args);
-  int i = SCHEME_INT_VAL(SCHEME_CADR(args));
+  Scheme_Object *obj = argv[0], *args = argv[1];
+  Scheme_Hash_Tree *subtree;
+  int i;
+  Scheme_Object *key;
+
+  if (SCHEME_INTP(args)) {
+    subtree = (Scheme_Hash_Tree *)obj;
+    i = SCHEME_INT_VAL(args);
+  } else {
+    /* ignore original ht */
+    subtree = (Scheme_Hash_Tree *)SCHEME_CAR(args);
+    i = SCHEME_INT_VAL(SCHEME_CADR(args));
+  }
   key = subtree->els[i];
-  
+
   if (SCHEME_NP_CHAPERONEP(obj))
     return chaperone_hash_key("", obj, key);
   else
@@ -4306,8 +4316,17 @@ Scheme_Object *unsafe_scheme_hash_tree_iterate_key(int argc, Scheme_Object *argv
 Scheme_Object *unsafe_scheme_hash_tree_iterate_value(int argc, Scheme_Object *argv[])
 {
   Scheme_Object *obj = argv[0], *args = argv[1];
-  Scheme_Hash_Tree *subtree = (Scheme_Hash_Tree *)SCHEME_CAR(args);
-  int i = SCHEME_INT_VAL(SCHEME_CADR(args));
+  Scheme_Hash_Tree *subtree;
+  int i;
+  
+  if (SCHEME_INTP(args)) {
+    subtree = (Scheme_Hash_Tree *)obj;
+    i = SCHEME_INT_VAL(args);
+  } else {
+    /* ignore original ht */
+    subtree = (Scheme_Hash_Tree *)SCHEME_CAR(args);
+    i = SCHEME_INT_VAL(SCHEME_CADR(args));
+  }
 
   if (SCHEME_NP_CHAPERONEP(obj)) {
     Scheme_Object *key = subtree->els[i], *chap_key;
@@ -4322,9 +4341,19 @@ Scheme_Object *unsafe_scheme_hash_tree_iterate_value(int argc, Scheme_Object *ar
 Scheme_Object *unsafe_scheme_hash_tree_iterate_pair(int argc, Scheme_Object *argv[])
 {
   Scheme_Object *obj = argv[0], *args = argv[1];
-  Scheme_Hash_Tree *subtree = (Scheme_Hash_Tree *)SCHEME_CAR(args);
-  int i = SCHEME_INT_VAL(SCHEME_CADR(args));
-  Scheme_Object *key = subtree->els[i];
+  Scheme_Hash_Tree *subtree;
+  int i;
+  Scheme_Object *key;
+
+  if (SCHEME_INTP(args)) {
+    subtree = (Scheme_Hash_Tree *)obj;
+    i = SCHEME_INT_VAL(args);
+  } else {
+    /* ignore original ht */
+    subtree = (Scheme_Hash_Tree *)SCHEME_CAR(args);
+    i = SCHEME_INT_VAL(SCHEME_CADR(args));
+  }
+  key = subtree->els[i];
 
   if (SCHEME_NP_CHAPERONEP(obj)) {
     Scheme_Object *chap_key, *chap_val;
@@ -4342,9 +4371,19 @@ Scheme_Object *unsafe_scheme_hash_tree_iterate_pair(int argc, Scheme_Object *arg
 Scheme_Object *unsafe_scheme_hash_tree_iterate_key_value(int argc, Scheme_Object *argv[])
 {
   Scheme_Object *obj = argv[0], *args = argv[1], *res[2];
-  Scheme_Hash_Tree *subtree = (Scheme_Hash_Tree *)SCHEME_CAR(args);
-  int i = SCHEME_INT_VAL(SCHEME_CADR(args));
-  Scheme_Object *key = subtree->els[i];
+  Scheme_Hash_Tree *subtree;
+  int i;
+  Scheme_Object *key;
+
+  if (SCHEME_INTP(args)) {
+    subtree = (Scheme_Hash_Tree *)obj;
+    i = SCHEME_INT_VAL(args);
+  } else {
+    /* ignore original ht */
+    subtree = (Scheme_Hash_Tree *)SCHEME_CAR(args);
+    i = SCHEME_INT_VAL(SCHEME_CADR(args));
+  }
+  key = subtree->els[i];
 
   if (SCHEME_NP_CHAPERONEP(obj)) {
     res[0] = chaperone_hash_key("", obj, key);
@@ -4365,28 +4404,58 @@ Scheme_Object *unsafe_scheme_hash_tree_iterate_start_star(int argc, Scheme_Objec
 }
 Scheme_Object *unsafe_scheme_hash_tree_iterate_next_star(int argc, Scheme_Object *argv[])
 {
-  return scheme_unsafe_hash_tree_next(argv[1]);
+  return scheme_unsafe_hash_tree_next((Scheme_Hash_Tree *)argv[0], argv[1]);
 }
 Scheme_Object *unsafe_scheme_hash_tree_iterate_key_star(int argc, Scheme_Object *argv[])
 {
   Scheme_Object *args = argv[1];
-  Scheme_Hash_Tree *ht = (Scheme_Hash_Tree *)SCHEME_CAR(args);
-  int i = SCHEME_INT_VAL(SCHEME_CADR(args));
+  Scheme_Hash_Tree *ht;
+  int i;
+
+  if (SCHEME_INTP(args)) {
+    ht = (Scheme_Hash_Tree *)argv[0];
+    i = SCHEME_INT_VAL(args);
+  } else {
+    /* ignore original ht */
+    ht = (Scheme_Hash_Tree *)SCHEME_CAR(args);
+    i = SCHEME_INT_VAL(SCHEME_CADR(args));
+  }
+
   return (Scheme_Object *)(ht->els[i]);
 }
 Scheme_Object *unsafe_scheme_hash_tree_iterate_value_star(int argc, Scheme_Object *argv[])
 {
   Scheme_Object *args = argv[1];
-  Scheme_Hash_Tree *ht = (Scheme_Hash_Tree *)SCHEME_CAR(args);
-  int i = SCHEME_INT_VAL(SCHEME_CADR(args)), popcount;
+  Scheme_Hash_Tree *ht;
+  int i, popcount;
+
+  if (SCHEME_INTP(args)) {
+    ht = (Scheme_Hash_Tree *)argv[0];
+    i = SCHEME_INT_VAL(args);
+  } else {
+    /* ignore original ht */
+    ht = (Scheme_Hash_Tree *)SCHEME_CAR(args);
+    i = SCHEME_INT_VAL(SCHEME_CADR(args));
+  }
+
   popcount = hamt_popcount(ht->bitmap);
   return (Scheme_Object *)(ht->els[i+popcount]);
 }
 Scheme_Object *unsafe_scheme_hash_tree_iterate_pair_star(int argc, Scheme_Object *argv[])
 {
   Scheme_Object *args = argv[1];
-  Scheme_Hash_Tree *ht = (Scheme_Hash_Tree *)SCHEME_CAR(args);
-  int i = SCHEME_INT_VAL(SCHEME_CADR(args)), popcount;
+  Scheme_Hash_Tree *ht;
+  int i, popcount;
+
+  if (SCHEME_INTP(args)) {
+    ht = (Scheme_Hash_Tree *)argv[0];
+    i = SCHEME_INT_VAL(args);
+  } else {
+    /* ignore original ht */
+    ht = (Scheme_Hash_Tree *)SCHEME_CAR(args);
+    i = SCHEME_INT_VAL(SCHEME_CADR(args));
+  }
+
   popcount = hamt_popcount(ht->bitmap);
   return scheme_make_pair(ht->els[i], ht->els[i+popcount]);
 }
@@ -4394,8 +4463,18 @@ Scheme_Object *unsafe_scheme_hash_tree_iterate_key_value_star(int argc, Scheme_O
 {
   Scheme_Object *res[2];
   Scheme_Object *args = argv[1];
-  Scheme_Hash_Tree *ht = (Scheme_Hash_Tree *)SCHEME_CAR(args);
-  int i = SCHEME_INT_VAL(SCHEME_CADR(args)), popcount;
+  Scheme_Hash_Tree *ht;
+  int i, popcount;
+
+  if (SCHEME_INTP(args)) {
+    ht = (Scheme_Hash_Tree *)argv[0];
+    i = SCHEME_INT_VAL(args);
+  } else {
+    /* ignore original ht */
+    ht = (Scheme_Hash_Tree *)SCHEME_CAR(args);
+    i = SCHEME_INT_VAL(SCHEME_CADR(args));
+  }
+
   popcount = hamt_popcount(ht->bitmap);
   res[0] = ht->els[i];
   res[1] = ht->els[i+popcount];

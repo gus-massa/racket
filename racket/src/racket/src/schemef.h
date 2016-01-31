@@ -524,7 +524,7 @@ MZ_EXTERN Scheme_Object *scheme_hash_tree_get(Scheme_Hash_Tree *tree, Scheme_Obj
 XFORM_NONGCING MZ_EXTERN Scheme_Object *scheme_eq_hash_tree_get(Scheme_Hash_Tree *tree, Scheme_Object *key);
 XFORM_NONGCING MZ_EXTERN mzlonglong scheme_hash_tree_next(Scheme_Hash_Tree *tree, mzlonglong pos);
 MZ_EXTERN Scheme_Object *scheme_unsafe_hash_tree_start(Scheme_Hash_Tree *ht);
-MZ_EXTERN Scheme_Object *scheme_unsafe_hash_tree_next(Scheme_Object *args);
+MZ_EXTERN Scheme_Object *scheme_unsafe_hash_tree_next(Scheme_Hash_Tree *ht, Scheme_Object *args);
 MZ_EXTERN Scheme_Object *scheme_hash_tree_next_no_check(Scheme_Hash_Tree *tree, mzlonglong pos);
 XFORM_NONGCING MZ_EXTERN int scheme_hash_tree_index(Scheme_Hash_Tree *tree, mzlonglong pos, Scheme_Object **_key, Scheme_Object **_val);
 MZ_EXTERN int scheme_hash_tree_equal(Scheme_Hash_Tree *t1, Scheme_Hash_Tree *t2);

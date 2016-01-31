@@ -2747,7 +2747,7 @@ Scheme_Object *scheme_hash_tree_next_no_check(Scheme_Hash_Tree *tree, mzlonglong
 # define HAMT_TRAVERSE_NEXT(i) ((i)+1)
 #endif
 
-// instead of returning an index, these unsafe ieration ops speed up traversal 
+// instead of returning an index, these unsafe iteration ops speed up traversal 
 // by returning a view into the tree consisting of a:
 //   - subtree
 //   - subtree index
@@ -2774,20 +2774,33 @@ Scheme_Object *scheme_unsafe_hash_tree_start(Scheme_Hash_Tree *ht)
       ht = (Scheme_Hash_Tree *)ht->els[i];
       i = 0;
     } else {
-      return scheme_make_pair((Scheme_Object *)ht,
-			      scheme_make_pair(scheme_make_integer_value(i),
-					       stack));
+      if (SCHEME_NULLP(stack))
+        return scheme_make_integer_value(i);
+      else
+	  return scheme_make_pair((Scheme_Object *)ht,
+                                scheme_make_pair(scheme_make_integer_value(i),
+                                                 stack));
     }
   }
   return NULL;
 }
 
 // args is a (cons subtree (cons subtree-index stack-of-parents))
-Scheme_Object *scheme_unsafe_hash_tree_next(Scheme_Object *args)
+Scheme_Object *scheme_unsafe_hash_tree_next(Scheme_Hash_Tree *ht, Scheme_Object *args)
 {
-  Scheme_Hash_Tree *ht = (Scheme_Hash_Tree *)SCHEME_CAR(args);
-  int i = SCHEME_INT_VAL(SCHEME_CADR(args))+1, popcount;
-  Scheme_Object *stack = SCHEME_CDDR(args);
+  int i, popcount;
+  Scheme_Object *stack;
+  
+  if (SCHEME_INTP(args)) {
+    i = SCHEME_INT_VAL(args)+1;
+    stack = scheme_null;
+  } else {
+    /* ignore original ht */
+    ht = (Scheme_Hash_Tree *)SCHEME_CAR(args);
+    i = SCHEME_INT_VAL(SCHEME_CADR(args))+1;
+    stack = SCHEME_CDDR(args);
+  }
+  
 
   //  ht = resolve_placeholder(ht); // only need to check for iterate-first
 
@@ -2814,9 +2827,12 @@ Scheme_Object *scheme_unsafe_hash_tree_next(Scheme_Object *args)
 	i = 0;
 	popcount = hamt_popcount(ht->bitmap);
       } else {
-	return scheme_make_pair((Scheme_Object *)ht,
-				scheme_make_pair(scheme_make_integer_value(i),
-						 stack));
+        if (SCHEME_NULLP(stack))
+          return scheme_make_integer_value(i);
+        else
+	    return scheme_make_pair((Scheme_Object *)ht,
+                                  scheme_make_pair(scheme_make_integer_value(i),
+                                                   stack));
       }
     }
   }

@@ -1676,22 +1676,6 @@ resolve_closure_compilation(Scheme_Object *_data, Resolve_Info *info,
     }
   }
 
-  /* To make compilation deterministic, sort the captured variables */
-  if (closure_size) {
-    Scheme_Compiled_Local **c;
-    int j = 0;
-    c = MALLOC_N(Scheme_Compiled_Local*, closure_size);
-    for (i = 0; i < captured->size; i++) {
-      if (captured->vals[i]) {
-        c[j++] = SCHEME_VAR(captured->keys[i]);
-      }
-    }
-    scheme_sort_resolve_compiled_local_array(c, closure_size);
-    for (i = 0; i < closure_size; i++) {
-      scheme_hash_set(captured, (Scheme_Object *)c[i], scheme_make_integer(i));
-    }
-  }
-
   if (has_tl && !can_lift)
     convert = 0;
 
@@ -1716,6 +1700,22 @@ resolve_closure_compilation(Scheme_Object *_data, Resolve_Info *info,
     }
 
     lifteds = SCHEME_CDR(lifteds);
+  }
+
+  /* To make compilation deterministic, sort the captured variables */
+  if (closure_size) {
+    Scheme_Compiled_Local **c;
+    int j = 0;
+    c = MALLOC_N(Scheme_Compiled_Local*, closure_size);
+    for (i = 0; i < captured->size; i++) {
+      if (captured->vals[i]) {
+        c[j++] = SCHEME_VAR(captured->keys[i]);
+      }
+    }
+    scheme_sort_resolve_compiled_local_array(c, closure_size);
+    for (i = 0; i < closure_size; i++) {
+      scheme_hash_set(captured, (Scheme_Object *)c[i], scheme_make_integer(i));
+    }
   }
 
   if (convert && (closure_size || has_tl || using_lifted)) {

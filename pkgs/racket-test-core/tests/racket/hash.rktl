@@ -203,14 +203,13 @@
     in-immutable-hash-keys in-mutable-hash-keys in-weak-hash-keys
     in-immutable-hash-values in-mutable-hash-values in-weak-hash-values)
   
-  (define lst1 (build-list 10 values))
-  (define lst2 (build-list 10 add1))
-  (test-hash-iters-generic lst1 lst2)
-  (test-hash-iters-specific lst1 lst2)
-  (define lst3 (build-list 100000 values))
-  (define lst4 (build-list 100000 add1))
-  (test-hash-iters-generic lst3 lst4)
-  (test-hash-iters-specific lst3 lst4))
+  (for* ([len (in-list '(10 100 1000 10000 #;100000))]
+         [shift (in-list '(0 10 20 #;30))])
+    (define lst1 (build-list len (lambda (x) (arithmetic-shift x shift))))
+    (define lst2 (build-list len add1))
+    (displayln (list len shift))
+    (time (test-hash-iters-generic lst1 lst2))
+    (time (test-hash-iters-specific lst1 lst2))))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

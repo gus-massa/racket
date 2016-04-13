@@ -4843,25 +4843,46 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   tb = b->tbranch;
   fb = b->fbranch;
   
+  /* Convert (if <id> expr <id>) to (if <id> expr #f) */
+  if (equivalent_exprs(t, fb, NULL, NULL, 0)) {
+    fb = scheme_false;
+  }
+
+  /* Convert (if <id> <id> #f) to <id>
+     and in test position, convert (if <id> <id> expr) to (if <id> #t expr)  */
+  if (equivalent_exprs(t, tb, NULL, NULL, 0)) {
+    if SCHEME_FALSEP(fb) {
+      if (pass = OPT_BRANCH_INI)
+        return scheme_optimize_expr(t, info, context);
+      if (pass = OPT_BRANCH_ALL)
+        info->size -= 2;
+      return t;
+    } else if (context & OPT_CONTEXT_BOOLEAN) {
+      tb = scheme_true;
+    }
+   }
+
+  /* Convert (if expr <id> <id>) to (begin expr <id>) */
+  if (pass != OPT_BRANCH_INI) {
+    Scheme_Object *nb;
+
+    nb = equivalent_exprs(tb, fb, NULL, NULL, context);
+    if (nb) {
+      if (pass = OPT_BRANCH_MIX)
+        nb = scheme_optimize_expr(nb, info, context);
+      if (pass = OPT_BRANCH_ALL)
+        info->size -= 1;
+      return make_discarding_first_sequence(t, nb, info);
+    }
+  }
+
   switch (pass) {
   case OPT_BRANCH_INI:
 
-    /* Convert (if <id> expr <id>) to (if <id> expr #f) */
-    if (equivalent_exprs(t, fb, NULL, NULL, 0)) {
-      fb = scheme_false;
-    }
-
-    /* For test position, convert (if <id> <id> expr) to (if <id> #t expr) */
-    if ((context & OPT_CONTEXT_BOOLEAN)
-        && equivalent_exprs(t, tb, NULL, NULL, 0)) {
-        tb = scheme_true;
-    }
-
     t = scheme_optimize_expr(t, info, OPT_CONTEXT_BOOLEAN | OPT_CONTEXT_SINGLED);
 
-    if (info->escapes) {
+    if (info->escapes)
       return t;
-    }
 
     b->test = t;
     b->tbranch = tb;
@@ -5010,7 +5031,8 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
 
       optimize_info_seq_done(info, &info_seq);
 
-      /* Try optimize: (if <expr> v v) => (begin <expr> v) */
+      /* Convert (if expr <id> <id>) => (begin expr <id>)
+         here using more information about each branch */
       {
         Scheme_Object *nb;
 
@@ -5040,15 +5062,6 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
         && SAME_OBJ(tb, scheme_true) && SAME_OBJ(fb, scheme_false)) {
         info->size -= 2;
         return t;
-    }
-
-    /* Try optimize: (if x x #f) => x 
-       This pattern is included in the previous reduction,
-       but this is still useful if x is mutable or a top level*/
-    if (SCHEME_FALSEP(fb)
-      && equivalent_exprs(t, tb, NULL, NULL, 0)) {
-      info->size -= 2;
-      return t;
     }
 
     /* Convert: (if (if M N #f) M2 K) => (if M (if N M2 K) K)

@@ -4823,244 +4823,270 @@ static int or_tentative(int x, int y)
   }
 }
 
-static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int context)
-{
-  Scheme_Branch_Rec *b;
-  Scheme_Object *t, *tb, *fb;
-  int init_vclock, init_aclock, init_kclock, init_sclock;
-  Optimize_Info *then_info, *else_info;
-  Optimize_Info *then_info_init, *else_info_init;
-  Optimize_Info_Sequence info_seq;
+/* Not optimized yet. */
+#define OPT_BRANCH_INI 0
 
-  b = (Scheme_Branch_Rec *)o;
+/* Test is optimized, but branch aren't. The state of info like just after optimizing the test */
+#define OPT_BRANCH_MIX 1
+
+/* All optimized. 
+   Info may contain type information gathered later */
+#define OPT_BRANCH_ALL -1
+
+
+static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int context, int pass)
+{
+  Scheme_Branch_Rec *b = (Scheme_Branch_Rec *)o;
+  Scheme_Object *t, *tb, *fb;
 
   t = b->test;
   tb = b->tbranch;
   fb = b->fbranch;
-
-  /* Convert (if <id> expr <id>) to (if <id> expr #f) */
-  if (equivalent_exprs(t, fb, NULL, NULL, 0)) {
-    fb = scheme_false;
-  }
   
-  /* For test position, convert (if <id> <id> expr) to (if <id> #t expr) */
-  if ((context & OPT_CONTEXT_BOOLEAN)
-      && equivalent_exprs(t, tb, NULL, NULL, 0)) {
-      tb = scheme_true;
-  }
+  switch (pass) {
+  case OPT_BRANCH_INI:
 
-  optimize_info_seq_init(info, &info_seq);
-
-  t = scheme_optimize_expr(t, info, OPT_CONTEXT_BOOLEAN | OPT_CONTEXT_SINGLED);
-
-  if (info->escapes) {
-    optimize_info_seq_done(info, &info_seq);
-    return t;
-  }
-
-  /* Try to lift out `let`s and `begin`s around a test: */
-  {
-    Scheme_Object *inside = NULL, *t2 = t;
-
-    while (1) {
-      extract_tail_inside(&t2, &inside);
-
-      /* Try optimize: (if (not x) y z) => (if x z y) */
-      if (SAME_TYPE(SCHEME_TYPE(t2), scheme_application2_type)) {
-        Scheme_App2_Rec *app = (Scheme_App2_Rec *)t2;
-        
-        if (SAME_PTR(scheme_not_proc, app->rator)) {
-          t2 = tb;
-          tb = fb;
-          fb = t2;
-          
-          t2 = app->rand;
-          t = replace_tail_inside(t2, inside, t);
-        } else
-          break;
-      } else
-        break;
+    /* Convert (if <id> expr <id>) to (if <id> expr #f) */
+    if (equivalent_exprs(t, fb, NULL, NULL, 0)) {
+      fb = scheme_false;
     }
 
-    if (!(SCHEME_TYPE(t2) > _scheme_ir_values_types_)) {
-      /* (if (let (...) (cons x y)) a b) => (if (begin (let (...) (begin x y #<void>)) #t/#f) a b)
-         but don't expand (if (let (...) (begin x K)) a b) */
-      Scheme_Object *pred;
+    /* For test position, convert (if <id> <id> expr) to (if <id> #t expr) */
+    if ((context & OPT_CONTEXT_BOOLEAN)
+        && equivalent_exprs(t, tb, NULL, NULL, 0)) {
+        tb = scheme_true;
+    }
 
-      pred = expr_implies_predicate(t2, info); 
-      if (pred) {
-        Scheme_Object *test_val = SAME_OBJ(pred, scheme_not_proc) ? scheme_false : scheme_true;
+    t = scheme_optimize_expr(t, info, OPT_CONTEXT_BOOLEAN | OPT_CONTEXT_SINGLED);
 
-        t2 = optimize_ignored(t2, info, 1, 0, 5);
-        t = replace_tail_inside(t2, inside, t);
+    if (info->escapes) {
+      return t;
+    }
 
-        t2 = test_val;
-        if (scheme_omittable_expr(t, 1, 5, 0, info, NULL)) {
-          t = test_val;
-          inside = NULL;
-        } else {
-          t = make_sequence_2(t, test_val);
-          inside = t;
+    b->test = t;
+    b->tbranch = tb;
+    b->fbranch = fb;
+    return optimize_branch((Scheme_Object*)o, info, context, OPT_BRANCH_MIX);
+
+  case OPT_BRANCH_MIX:
+    {
+      int init_vclock, init_aclock, init_kclock, init_sclock;
+      Optimize_Info *then_info, *else_info;
+      Optimize_Info *then_info_init, *else_info_init;
+      Optimize_Info_Sequence info_seq;
+
+      /* Try to lift out `let`s and `begin`s around a test: */
+      {
+        Scheme_Object *inside = NULL, *t2 = t;
+
+        while (1) {
+          extract_tail_inside(&t2, &inside);
+
+          /* Try optimize: (if (not x) y z) => (if x z y) */
+          if (SAME_TYPE(SCHEME_TYPE(t2), scheme_application2_type)) {
+            Scheme_App2_Rec *app = (Scheme_App2_Rec *)t2;
+
+            if (SAME_PTR(scheme_not_proc, app->rator)) {
+              t2 = tb;
+              tb = fb;
+              fb = t2;
+
+              t2 = app->rand;
+              t = replace_tail_inside(t2, inside, t);
+            } else
+              break;
+          } else
+            break;
         }
+
+        if (!(SCHEME_TYPE(t2) > _scheme_ir_values_types_)) {
+          /* (if (let (...) (cons x y)) a b) => (if (begin (let (...) (begin x y #<void>)) #t/#f) a b)
+             but don't expand (if (let (...) (begin x K)) a b) */
+          Scheme_Object *pred;
+
+          pred = expr_implies_predicate(t2, info); 
+          if (pred) {
+            Scheme_Object *test_val = SAME_OBJ(pred, scheme_not_proc) ? scheme_false : scheme_true;
+
+            t2 = optimize_ignored(t2, info, 1, 0, 5);
+            t = replace_tail_inside(t2, inside, t);
+
+            t2 = test_val;
+            if (scheme_omittable_expr(t, 1, 5, 0, info, NULL)) {
+              t = test_val;
+              inside = NULL;
+            } else {
+              t = make_sequence_2(t, test_val);
+              inside = t;
+            }
+          }
+        }
+
+        if (SCHEME_TYPE(t2) > _scheme_ir_values_types_) {
+          /* Branch is statically known */
+          Scheme_Object *xb;
+
+          info->size -= 1;
+
+          if (SCHEME_FALSEP(t2))
+            xb = scheme_optimize_expr(fb, info, scheme_optimize_tail_context(context));
+          else
+            xb = scheme_optimize_expr(tb, info, scheme_optimize_tail_context(context));
+
+          return replace_tail_inside(xb, inside, t);
+        }
+      }
+
+      optimize_info_seq_init(info, &info_seq);
+
+      info->vclock += 1; /* model branch as clock increment */
+
+      init_vclock = info->vclock;
+      init_aclock = info->aclock;
+      init_kclock = info->kclock;
+      init_sclock = info->sclock;
+
+      then_info = optimize_info_add_frame(info, 0, 0, 0);
+      add_types_for_t_branch(t, then_info, 5);
+      then_info_init = optimize_info_add_frame(then_info, 0, 0, 0);
+      tb = scheme_optimize_expr(tb, then_info, scheme_optimize_tail_context(context));
+      optimize_info_done(then_info, NULL);
+
+      info->escapes = 0;
+      info->vclock = init_vclock;
+      info->aclock = init_aclock;
+      info->kclock = init_kclock;
+      info->sclock = init_sclock;
+
+      optimize_info_seq_step(info, &info_seq);
+
+      else_info = optimize_info_add_frame(info, 0, 0, 0);
+      add_types_for_f_branch(t, else_info, 5);
+      else_info_init = optimize_info_add_frame(else_info, 0, 0, 0);
+      fb = scheme_optimize_expr(fb, else_info, scheme_optimize_tail_context(context));
+      optimize_info_done(else_info, NULL);
+
+      if (then_info->escapes && else_info->escapes) {
+        /* both branches escaped */
+        info->preserves_marks = 1;
+        info->single_result = 1;
+        info->kclock = init_kclock;
+
+      } else if (info->escapes) {
+        info->preserves_marks = then_info->preserves_marks;
+        info->single_result = then_info->single_result;
+        info->kclock = then_info->kclock;
+        merge_types(then_info, info, NULL);
+        info->escapes = 0;
+
+      } else if (then_info->escapes) {
+        info->preserves_marks = else_info->preserves_marks;
+        info->single_result = else_info->single_result;
+        merge_types(else_info, info, NULL);
+        info->escapes = 0;
+
+      } else {
+        int new_preserves_marks, new_single_result;
+
+        new_preserves_marks = or_tentative(then_info->preserves_marks, else_info->preserves_marks);
+        info->preserves_marks = new_preserves_marks;
+        new_single_result = or_tentative(then_info->single_result, else_info->single_result);
+        info->single_result = new_single_result;
+        if (then_info->kclock > info->kclock)
+          info->kclock = then_info->kclock;
+        merge_branchs_types(then_info, else_info, info);
+      }
+
+      if (then_info->sclock > info->sclock)
+        info->sclock = then_info->sclock;
+      if (then_info->aclock > info->aclock)
+        info->aclock = then_info->aclock;
+
+      if ((init_vclock == then_info->vclock) && (init_vclock == info->vclock)) {
+        /* we can rewind the vclock to just after the test, because the
+           `if` as a whole has no effect */
+        info->vclock--;
+      }
+
+      optimize_info_seq_done(info, &info_seq);
+
+      /* Try optimize: (if <expr> v v) => (begin <expr> v) */
+      {
+        Scheme_Object *nb;
+
+        nb = equivalent_exprs(tb, fb, then_info_init, else_info_init, context);
+        if (nb) {
+          info->size -= 1;
+          return make_discarding_first_sequence(t, nb, info);
+        }
+      }
+
+      b->test = t;
+      b->tbranch = tb;
+      b->fbranch = fb;
+      return optimize_branch((Scheme_Object*)b, info, context, OPT_BRANCH_ALL);
+    }
+  case OPT_BRANCH_ALL:
+
+    /* Try optimize: (if x #f #t) => (not x) */
+    if (SCHEME_FALSEP(tb)
+        && SAME_OBJ(fb, scheme_true)) {
+      info->size -= 2;
+      return make_optimize_prim_application2(scheme_not_proc, t, info, context);
+    }
+
+    /* For test position, convert (if <expr> #t #f) to <expr> */
+    if ((context & OPT_CONTEXT_BOOLEAN)
+        && SAME_OBJ(tb, scheme_true) && SAME_OBJ(fb, scheme_false)) {
+        info->size -= 2;
+        return t;
+    }
+
+    /* Try optimize: (if x x #f) => x 
+       This pattern is included in the previous reduction,
+       but this is still useful if x is mutable or a top level*/
+    if (SCHEME_FALSEP(fb)
+      && equivalent_exprs(t, tb, NULL, NULL, 0)) {
+      info->size -= 2;
+      return t;
+    }
+
+    /* Convert: (if (if M N #f) M2 K) => (if M (if N M2 K) K)
+       for simple constants K. This is useful to expose simple
+       tests to the JIT. */
+    if (SAME_TYPE(SCHEME_TYPE(t), scheme_branch_type)
+        && scheme_ir_duplicate_ok(fb, 0)) {
+      Scheme_Branch_Rec *b2 = (Scheme_Branch_Rec *)t;
+      if (SCHEME_FALSEP(b2->fbranch)) {
+        Scheme_Object *fb3;
+        Scheme_Branch_Rec *b3;
+        b3 = MALLOC_ONE_TAGGED(Scheme_Branch_Rec);
+        b3->so.type = scheme_branch_type;
+        b3->test = b2->tbranch;
+        b3->tbranch = tb;
+        fb3 = optimize_clone(0, fb, info, empty_eq_hash_tree, 0);
+        b3->fbranch = fb3;
+        t = b2->test;
+        tb = (Scheme_Object *)b3;
       }
     }
 
-    if (SCHEME_TYPE(t2) > _scheme_ir_values_types_) {
-      /* Branch is statically known */
-      Scheme_Object *xb;
-
-      optimize_info_seq_done(info, &info_seq);
-      info->size -= 1;
-
-      if (SCHEME_FALSEP(t2))
-        xb = scheme_optimize_expr(fb, info, scheme_optimize_tail_context(context));
-      else
-        xb = scheme_optimize_expr(tb, info, scheme_optimize_tail_context(context));
-      
-      optimize_info_seq_done(info, &info_seq);
-      return replace_tail_inside(xb, inside, t);
+    if (OPT_BRANCH_ADDS_NO_SIZE) {
+      /* Seems to work better to not to increase the size
+         specifically for `if' */
+    } else {
+      info->size += 1;
     }
+    
+    b->test = t;
+    b->tbranch = tb;
+    b->fbranch = fb;
+    return (Scheme_Object*)b;
+
+  default:
+    scheme_signal_error("internal error: strange inside replacement");
+    return NULL;
   }
-
-  optimize_info_seq_step(info, &info_seq);
-
-  info->vclock += 1; /* model branch as clock increment */
-
-  init_vclock = info->vclock;
-  init_aclock = info->aclock;
-  init_kclock = info->kclock;
-  init_sclock = info->sclock;
-
-  then_info = optimize_info_add_frame(info, 0, 0, 0);
-  add_types_for_t_branch(t, then_info, 5);
-  then_info_init = optimize_info_add_frame(then_info, 0, 0, 0);
-  tb = scheme_optimize_expr(tb, then_info, scheme_optimize_tail_context(context));
-  optimize_info_done(then_info, NULL);
-
-  info->escapes = 0;
-  info->vclock = init_vclock;
-  info->aclock = init_aclock;
-  info->kclock = init_kclock;
-  info->sclock = init_sclock;
-
-  optimize_info_seq_step(info, &info_seq);
-
-  else_info = optimize_info_add_frame(info, 0, 0, 0);
-  add_types_for_f_branch(t, else_info, 5);
-  else_info_init = optimize_info_add_frame(else_info, 0, 0, 0);
-  fb = scheme_optimize_expr(fb, else_info, scheme_optimize_tail_context(context));
-  optimize_info_done(else_info, NULL);
-
-  if (then_info->escapes && else_info->escapes) {
-    /* both branches escaped */
-    info->preserves_marks = 1;
-    info->single_result = 1;
-    info->kclock = init_kclock;
-
-  } else if (info->escapes) {
-    info->preserves_marks = then_info->preserves_marks;
-    info->single_result = then_info->single_result;
-    info->kclock = then_info->kclock;
-    merge_types(then_info, info, NULL);
-    info->escapes = 0;
-
-  } else if (then_info->escapes) {
-      info->preserves_marks = else_info->preserves_marks;
-      info->single_result = else_info->single_result;
-      merge_types(else_info, info, NULL);
-      info->escapes = 0;
-
-  } else {
-    int new_preserves_marks, new_single_result;
-
-    new_preserves_marks = or_tentative(then_info->preserves_marks, else_info->preserves_marks);
-    info->preserves_marks = new_preserves_marks;
-    new_single_result = or_tentative(then_info->single_result, else_info->single_result);
-    info->single_result = new_single_result;
-    if (then_info->kclock > info->kclock)
-      info->kclock = then_info->kclock;
-    merge_branchs_types(then_info, else_info, info);
-  }
-
-  if (then_info->sclock > info->sclock)
-    info->sclock = then_info->sclock;
-  if (then_info->aclock > info->aclock)
-    info->aclock = then_info->aclock;
-
-  if ((init_vclock == then_info->vclock) && (init_vclock == info->vclock)) {
-    /* we can rewind the vclock to just after the test, because the
-       `if` as a whole has no effect */
-    info->vclock--;
-  }
-
-  optimize_info_seq_done(info, &info_seq);
-
-  /* Try optimize: (if x #f #t) => (not x) */
-  if (SCHEME_FALSEP(tb)
-      && SAME_OBJ(fb, scheme_true)) {
-    info->size -= 2;
-    return make_optimize_prim_application2(scheme_not_proc, t, info, context);
-  }
-
-  /* For test position, convert (if <expr> #t #f) to <expr> */
-  if ((context & OPT_CONTEXT_BOOLEAN)
-      && SAME_OBJ(tb, scheme_true) && SAME_OBJ(fb, scheme_false)) {
-      info->size -= 2;
-      return t;
-  }
-
-  /* Try optimize: (if <expr> v v) => (begin <expr> v) */
-  {
-    Scheme_Object *nb;
-
-    nb = equivalent_exprs(tb, fb, then_info_init, else_info_init, context);
-    if (nb) {
-      info->size -= 1;
-      return make_discarding_first_sequence(t, nb, info);
-    }
-  }
-
-  /* Try optimize: (if x x #f) => x 
-     This pattern is included in the previous reduction,
-     but this is still useful if x is mutable or a top level*/
-  if (SCHEME_FALSEP(fb)
-      && equivalent_exprs(t, tb, NULL, NULL, 0)) {
-      info->size -= 2;
-      return t;
-  }
-
-  /* Convert: (if (if M N #f) M2 K) => (if M (if N M2 K) K)
-     for simple constants K. This is useful to expose simple
-     tests to the JIT. */
-  if (SAME_TYPE(SCHEME_TYPE(t), scheme_branch_type)
-      && scheme_ir_duplicate_ok(fb, 0)) {
-    Scheme_Branch_Rec *b2 = (Scheme_Branch_Rec *)t;
-    if (SCHEME_FALSEP(b2->fbranch)) {
-      Scheme_Object *fb3;
-      Scheme_Branch_Rec *b3;
-      b3 = MALLOC_ONE_TAGGED(Scheme_Branch_Rec);
-      b3->so.type = scheme_branch_type;
-      b3->test = b2->tbranch;
-      b3->tbranch = tb;
-      fb3 = optimize_clone(0, fb, info, empty_eq_hash_tree, 0);
-      b3->fbranch = fb3;
-      t = b2->test;
-      tb = (Scheme_Object *)b3;
-    }
-  }
-
-  b->test = t;
-  b->tbranch = tb;
-  b->fbranch = fb;
-
-  if (OPT_BRANCH_ADDS_NO_SIZE) {
-    /* Seems to work better to not to increase the size
-       specifically for `if' */
-  } else {
-    info->size += 1;
-  }
-
-  return o;
 }
 
 /*========================================================================*/
@@ -8283,7 +8309,7 @@ Scheme_Object *scheme_optimize_expr(Scheme_Object *expr, Optimize_Info *info, in
   case scheme_splice_sequence_type:
     return optimize_sequence(expr, info, context, 1);
   case scheme_branch_type:
-    return optimize_branch(expr, info, context);
+    return optimize_branch(expr, info, context, OPT_BRANCH_INI);
   case scheme_with_cont_mark_type:
     return optimize_wcm(expr, info, context);
   case scheme_ir_lambda_type:

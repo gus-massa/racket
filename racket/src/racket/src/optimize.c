@@ -4848,29 +4848,66 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
     fb = scheme_false;
   }
 
-  /* Convert (if <id> <id> #f) to <id>
-     and in test position, convert (if <id> <id> expr) to (if <id> #t expr)  */
-  if (equivalent_exprs(t, tb, NULL, NULL, 0)) {
-    if SCHEME_FALSEP(fb) {
-      if (pass = OPT_BRANCH_INI)
-        return scheme_optimize_expr(t, info, context);
-      if (pass = OPT_BRANCH_ALL)
-        info->size -= 2;
-      return t;
-    } else if (context & OPT_CONTEXT_BOOLEAN) {
-      tb = scheme_true;
+  /* In test position, convert (if <id> <id> expr) to (if <id> #t expr)  */
+  if ((context & OPT_CONTEXT_BOOLEAN)
+      && equivalent_exprs(t, tb, NULL, NULL, 0)) {
+    tb = scheme_true;
+  }
+
+  /* Convert (if expr #f #t) => (not x) */
+  if (SCHEME_FALSEP(tb)
+      && SAME_OBJ(fb, scheme_true)) {
+    if (pass == OPT_BRANCH_INI) {
+      t = scheme_optimize_expr(t, info, OPT_CONTEXT_BOOLEAN | OPT_CONTEXT_SINGLED);
+      if (info->escapes)
+        return t;
     }
-   }
+    if (pass == OPT_BRANCH_ALL)
+      info->size -= 2;
+    return make_optimize_prim_application2(scheme_not_proc, t, info, context);
+  }
+
+  /* Convert (if <id> <id> #f) to <id>  */
+  if (SCHEME_FALSEP(fb)
+      && equivalent_exprs(t, tb, NULL, NULL, 0)) {
+    if (pass == OPT_BRANCH_INI) {
+      t = scheme_optimize_expr(t, info, OPT_CONTEXT_BOOLEAN | OPT_CONTEXT_SINGLED);
+      if (info->escapes)
+        return t;
+    }
+    if (pass == OPT_BRANCH_ALL)
+      info->size -= 2;
+    return ensure_single_value(t);
+  }
+
+  /* For test position, convert (if expr #t #f) to expr */
+  if ((context & OPT_CONTEXT_BOOLEAN)
+      && SAME_OBJ(tb, scheme_true)
+      && SAME_OBJ(fb, scheme_false)) {
+    if (pass == OPT_BRANCH_INI) {
+      t = scheme_optimize_expr(t, info, context);
+      if (info->escapes)
+        return t;
+    }
+    if (pass == OPT_BRANCH_ALL)
+      info->size -= 2;
+    return ensure_single_value(t);
+  }
 
   /* Convert (if expr <id> <id>) to (begin expr <id>) */
-  if (pass != OPT_BRANCH_INI) {
+  {
     Scheme_Object *nb;
 
     nb = equivalent_exprs(tb, fb, NULL, NULL, context);
     if (nb) {
-      if (pass = OPT_BRANCH_MIX)
+      if (pass == OPT_BRANCH_INI) {
+        t = scheme_optimize_expr(t, info, OPT_CONTEXT_BOOLEAN | OPT_CONTEXT_SINGLED);
+        if (info->escapes)
+          return t;
+      }
+      if (pass != OPT_BRANCH_ALL)
         nb = scheme_optimize_expr(nb, info, context);
-      if (pass = OPT_BRANCH_ALL)
+      if (pass == OPT_BRANCH_ALL)
         info->size -= 1;
       return make_discarding_first_sequence(t, nb, info);
     }
@@ -5049,20 +5086,6 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
       return optimize_branch((Scheme_Object*)b, info, context, OPT_BRANCH_ALL);
     }
   case OPT_BRANCH_ALL:
-
-    /* Try optimize: (if x #f #t) => (not x) */
-    if (SCHEME_FALSEP(tb)
-        && SAME_OBJ(fb, scheme_true)) {
-      info->size -= 2;
-      return make_optimize_prim_application2(scheme_not_proc, t, info, context);
-    }
-
-    /* For test position, convert (if <expr> #t #f) to <expr> */
-    if ((context & OPT_CONTEXT_BOOLEAN)
-        && SAME_OBJ(tb, scheme_true) && SAME_OBJ(fb, scheme_false)) {
-        info->size -= 2;
-        return t;
-    }
 
     /* Convert: (if (if M N #f) M2 K) => (if M (if N M2 K) K)
        for simple constants K. This is useful to expose simple

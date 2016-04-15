@@ -4885,13 +4885,60 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
       && SAME_OBJ(tb, scheme_true)
       && SAME_OBJ(fb, scheme_false)) {
     if (pass == OPT_BRANCH_INI) {
-      t = scheme_optimize_expr(t, info, context);
+      t = scheme_optimize_expr(t, info, OPT_CONTEXT_BOOLEAN | OPT_CONTEXT_SINGLED);
       if (info->escapes)
         return t;
     }
     if (pass == OPT_BRANCH_ALL)
       info->size -= 2;
     return ensure_single_value(t);
+  }
+
+  if (SCHEME_TYPE(t) > _scheme_ir_values_types_) {
+    /* Branch is statically known */
+    Scheme_Object *xb;
+
+    xb = SCHEME_FALSEP(t)? fb : tb;
+    if (pass != OPT_BRANCH_ALL)
+      xb = scheme_optimize_expr(xb, info, scheme_optimize_tail_context(context));
+
+    if (pass != OPT_BRANCH_INI)
+      info->size -= 1;
+    if (pass == OPT_BRANCH_ALL)
+      info->size -= 1;
+
+    return xb;
+  }
+
+  if (!(SCHEME_TYPE(t) > _scheme_ir_values_types_)) {
+    /* (if (cons x y) a b) => (begin (begin x y #<void>) a/b) */
+    Scheme_Object *pred;
+    int save_no_types = info->no_types;
+
+    if (pass == OPT_BRANCH_ALL)
+      info->no_types = 1;
+    pred = expr_implies_predicate(t, info); 
+    if (pass == OPT_BRANCH_ALL)
+      info->no_types = save_no_types;
+
+    if (pred) {
+      Scheme_Object *xb;
+
+      if (pass == OPT_BRANCH_INI) {
+        t = scheme_optimize_expr(t, info, OPT_CONTEXT_BOOLEAN | OPT_CONTEXT_SINGLED);
+        if (info->escapes)
+          return t;
+      }
+    
+      xb = SAME_OBJ(pred, scheme_not_proc)? fb : tb;
+      if (pass != OPT_BRANCH_ALL)
+        xb = scheme_optimize_expr(xb, info, scheme_optimize_tail_context(context));
+
+      if (pass == OPT_BRANCH_ALL)
+        info->size -= 1;
+
+      return make_discarding_first_sequence(t, xb, info);
+    }
   }
 
   /* Convert (if expr <id> <id>) to (begin expr <id>) */
@@ -4955,43 +5002,6 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
               break;
           } else
             break;
-        }
-
-        if (!(SCHEME_TYPE(t2) > _scheme_ir_values_types_)) {
-          /* (if (let (...) (cons x y)) a b) => (if (begin (let (...) (begin x y #<void>)) #t/#f) a b)
-             but don't expand (if (let (...) (begin x K)) a b) */
-          Scheme_Object *pred;
-
-          pred = expr_implies_predicate(t2, info); 
-          if (pred) {
-            Scheme_Object *test_val = SAME_OBJ(pred, scheme_not_proc) ? scheme_false : scheme_true;
-
-            t2 = optimize_ignored(t2, info, 1, 0, 5);
-            t = replace_tail_inside(t2, inside, t);
-
-            t2 = test_val;
-            if (scheme_omittable_expr(t, 1, 5, 0, info, NULL)) {
-              t = test_val;
-              inside = NULL;
-            } else {
-              t = make_sequence_2(t, test_val);
-              inside = t;
-            }
-          }
-        }
-
-        if (SCHEME_TYPE(t2) > _scheme_ir_values_types_) {
-          /* Branch is statically known */
-          Scheme_Object *xb;
-
-          info->size -= 1;
-
-          if (SCHEME_FALSEP(t2))
-            xb = scheme_optimize_expr(fb, info, scheme_optimize_tail_context(context));
-          else
-            xb = scheme_optimize_expr(tb, info, scheme_optimize_tail_context(context));
-
-          return replace_tail_inside(xb, inside, t);
         }
       }
 

@@ -4843,6 +4843,46 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
   tb = b->tbranch;
   fb = b->fbranch;
   
+  /* Try to lift out `let`s and `begin`s around a test: */
+  {
+    Scheme_Object *inside = NULL, *t2 = t;
+
+    while (1) {
+      extract_tail_inside(&t2, &inside);
+
+      /* Try optimize: (if (not x) y z) => (if x z y) */
+      if (SAME_TYPE(SCHEME_TYPE(t2), scheme_application2_type)) {
+        Scheme_App2_Rec *app = (Scheme_App2_Rec *)t2;
+
+        if (SAME_PTR(scheme_not_proc, app->rator)) {
+          t2 = tb;
+          tb = fb;
+          fb = t2;
+
+          t2 = app->rand;
+          t = replace_tail_inside(t2, inside, t);
+        } else
+          break;
+      } else
+        break;
+    }
+
+    if (inside) {
+      Scheme_Object *n;
+
+      b->test = t2;
+      b->tbranch = tb;
+      b->fbranch = fb;
+      n = (Scheme_Object*)b;
+      if (pass != OPT_BRANCH_INI)
+        n = optimize_branch(n, info, context, pass);
+      t = replace_tail_inside(n, inside, t);
+      if (pass == OPT_BRANCH_INI)
+        t = scheme_optimize_expr(t, info, context);
+      return t;
+    }
+  }
+
   /* Convert (if <id> expr <id>) to (if <id> expr #f) */
   if (equivalent_exprs(t, fb, NULL, NULL, 0)) {
     fb = scheme_false;
@@ -4898,7 +4938,7 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
     /* Branch is statically known */
     Scheme_Object *xb;
 
-    xb = SCHEME_FALSEP(t)? fb : tb;
+    xb = SCHEME_FALSEP(t) ? fb : tb;
     if (pass != OPT_BRANCH_ALL)
       xb = scheme_optimize_expr(xb, info, scheme_optimize_tail_context(context));
 
@@ -4924,13 +4964,24 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
     if (pred) {
       Scheme_Object *xb;
 
+      if (SAME_OBJ(pred, scheme_not_proc)) {
+        xb = fb;
+        tb = scheme_void;
+      } else {
+        xb = tb;
+        fb = scheme_void;
+      }
+     
       if (pass == OPT_BRANCH_INI) {
         t = scheme_optimize_expr(t, info, OPT_CONTEXT_BOOLEAN | OPT_CONTEXT_SINGLED);
         if (info->escapes)
           return t;
+        b->test = t;
+        b->tbranch = tb;
+        b->fbranch = fb;
+        return optimize_branch((Scheme_Object*)b, info, context, OPT_BRANCH_MIX);
       }
     
-      xb = SAME_OBJ(pred, scheme_not_proc)? fb : tb;
       if (pass != OPT_BRANCH_ALL)
         xb = scheme_optimize_expr(xb, info, scheme_optimize_tail_context(context));
 
@@ -4971,7 +5022,7 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
     b->test = t;
     b->tbranch = tb;
     b->fbranch = fb;
-    return optimize_branch((Scheme_Object*)o, info, context, OPT_BRANCH_MIX);
+    return optimize_branch((Scheme_Object*)b, info, context, OPT_BRANCH_MIX);
 
   case OPT_BRANCH_MIX:
     {
@@ -4979,31 +5030,6 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
       Optimize_Info *then_info, *else_info;
       Optimize_Info *then_info_init, *else_info_init;
       Optimize_Info_Sequence info_seq;
-
-      /* Try to lift out `let`s and `begin`s around a test: */
-      {
-        Scheme_Object *inside = NULL, *t2 = t;
-
-        while (1) {
-          extract_tail_inside(&t2, &inside);
-
-          /* Try optimize: (if (not x) y z) => (if x z y) */
-          if (SAME_TYPE(SCHEME_TYPE(t2), scheme_application2_type)) {
-            Scheme_App2_Rec *app = (Scheme_App2_Rec *)t2;
-
-            if (SAME_PTR(scheme_not_proc, app->rator)) {
-              t2 = tb;
-              tb = fb;
-              fb = t2;
-
-              t2 = app->rand;
-              t = replace_tail_inside(t2, inside, t);
-            } else
-              break;
-          } else
-            break;
-        }
-      }
 
       optimize_info_seq_init(info, &info_seq);
 

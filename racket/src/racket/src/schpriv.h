@@ -3265,13 +3265,18 @@ Scheme_Object *scheme_optimize_expr(Scheme_Object *, Optimize_Info *, int contex
 #define OPT_CONTEXT_NO_SINGLE  0x2
 /* Context checks that result is a single value and is non-tail w.r.t. to same clock as bindig: */
 #define OPT_CONTEXT_SINGLED    0x4
-#define OPT_CONTEXT_TYPE_SHIFT 4
+/* Context is directly in a rator position: */
+#define OPT_CONTEXT_RATOR      0x8
+#define OPT_CONTEXT_TYPE_SHIFT 5
 #define OPT_CONTEXT_TYPE_MASK  (SCHEME_MAX_LOCAL_TYPE_MASK << OPT_CONTEXT_TYPE_SHIFT)
 #define OPT_CONTEXT_TYPE(oc)   ((oc & OPT_CONTEXT_TYPE_MASK) >> OPT_CONTEXT_TYPE_SHIFT)
 #define OPT_CONTEXT_APP_COUNT_SHIFT (OPT_CONTEXT_TYPE_SHIFT + SCHEME_MAX_LOCAL_TYPE_BITS)
 #define OPT_CONTEXT_APP_COUNT(oc) ((oc >> OPT_CONTEXT_APP_COUNT_SHIFT) & SCHEME_USE_COUNT_INF)
 
-#define scheme_optimize_result_context(c) (c & (~(OPT_CONTEXT_TYPE_MASK | OPT_CONTEXT_NO_SINGLE | OPT_CONTEXT_SINGLED)))
+#define scheme_optimize_result_context(c) (c & (~(OPT_CONTEXT_TYPE_MASK   \
+                                                  | OPT_CONTEXT_NO_SINGLE \
+                                                  | OPT_CONTEXT_SINGLED   \
+                                                  | OPT_CONTEXT_RATOR)))
 #define scheme_optimize_tail_context(c)   scheme_optimize_result_context(c) 
 
 Scheme_Object *scheme_optimize_apply_values(Scheme_Object *f, Scheme_Object *e, 

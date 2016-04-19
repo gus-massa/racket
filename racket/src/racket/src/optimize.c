@@ -137,6 +137,8 @@ static void propagate_used_variables(Optimize_Info *info);
 static int env_uses_toplevel(Optimize_Info *frame);
 static Scheme_IR_Local *clone_variable(Scheme_IR_Local *var);
 static void increment_use_count(Scheme_IR_Local *var, int as_rator);
+static void decrement_use_count(Scheme_IR_Local *var, int as_rator);
+static void from_rator_to_container(Scheme_Object *e);
 
 static Optimize_Info *optimize_info_add_frame(Optimize_Info *info, int orig, int current, int flags);
 static void optimize_info_done(Optimize_Info *info, Optimize_Info *parent);
@@ -153,6 +155,7 @@ static Scheme_Object *no_potential_size(Scheme_Object *value);
 static Scheme_Object *optimize_lets(Scheme_Object *form, Optimize_Info *info, int for_inline, int context);
 
 static Scheme_Object *optimize_clone(int single_use, Scheme_Object *obj, Optimize_Info *info, Scheme_Hash_Tree *var_map, int as_rator);
+static void optimize_drop(Scheme_Object *e, Optimize_Info *info, int as_rator, int before_opt);
 
 XFORM_NONGCING static int relevant_predicate(Scheme_Object *pred);
 XFORM_NONGCING static int predicate_implies(Scheme_Object *pred1, Scheme_Object *pred2);
@@ -666,13 +669,17 @@ static Scheme_Object *do_make_discarding_sequence(Scheme_Object *e1, Scheme_Obje
     
   e2 = ensure_single_value(e2);
   
-  if (scheme_omittable_expr(e1, 1, 5, 0, info, NULL))
+  if (scheme_omittable_expr(e1, 1, 5, 0, info, NULL)) {
+    optimize_drop(e1, info, 0, 0);
     return e2;
+  }
     
   e1 = ensure_single_value(optimize_ignored(e1, info, 1, 0, 5));
 
-  if (ignored && scheme_omittable_expr(e2, 1, 5, 0, info, NULL))
+  if (ignored && scheme_omittable_expr(e2, 1, 5, 0, info, NULL)) {
+    optimize_drop(e2, info, 0, 0);
     return e1;
+  }
 
   /* use `begin` instead of `begin0` if we can swap the order: */
   if (rev && movable_expression(e2, info, 0, 1, 1, 0, 50))
@@ -751,9 +758,10 @@ static Scheme_Object *optimize_ignored(Scheme_Object *e, Optimize_Info *info,
    `expected_vals` is 1 or -1. If `maybe_omittable`, the result can be
    NULL to indicate that it can be omitted. */
 {
-  if (maybe_omittable) {
-    if (scheme_omittable_expr(e, expected_vals, 5, 0, info, NULL))
-      return NULL;
+  if (scheme_omittable_expr(e, expected_vals, 5, 0, info, NULL)) {
+    /* Assume that e is never a rator */
+    optimize_drop(e, info, 0, 0);
+    return maybe_omittable ? NULL : scheme_void;
   }
 
   if (fuel) {
@@ -808,10 +816,77 @@ static Scheme_Object *optimize_ignored(Scheme_Object *e, Optimize_Info *info,
           return make_discarding_app_sequence(app, -1, NULL, info);
       }
       break;
+    case scheme_sequence_type:
+      {
+        Scheme_Sequence *seq = (Scheme_Sequence *)e;
+        Scheme_Object *new;
+        new = optimize_ignored(seq->array[seq->count-1], info, expected_vals, 0, fuel);
+        seq->array[seq->count-1] = new;
+      }
+    case scheme_begin0_sequence_type:
+      {
+        Scheme_Sequence *seq = (Scheme_Sequence *)e;
+        Scheme_Object *new;
+        new = optimize_ignored(seq->array[0], info, expected_vals, 0, fuel-1);
+        seq->array[0] = new;
+      }
     }
   }
 
   return e;
+}
+
+static void optimize_drop(Scheme_Object *e, Optimize_Info *info, int as_rator, int before_opt)
+/* The expression is dropped. Decrease the use count of the variables and
+   if not before_opt also decrease the size in info. */
+{
+  switch (SCHEME_TYPE(e)) {
+  case scheme_ir_local_type:
+    {
+      decrement_use_count(SCHEME_VAR(e), as_rator);
+    }
+    break;
+  case scheme_application2_type:
+    {
+      Scheme_App2_Rec *app = (Scheme_App2_Rec *)e;
+      optimize_drop(app->rator, info, 1, before_opt);
+      optimize_drop(app->rand, info, 0, before_opt);
+    }
+    break;
+  case scheme_application3_type:
+    {
+      Scheme_App3_Rec *app = (Scheme_App3_Rec *)e;
+      optimize_drop(app->rator, info, 1, before_opt);
+      optimize_drop(app->rand1, info, 0, before_opt);
+      optimize_drop(app->rand2, info, 0, before_opt);
+    }
+    break;
+  case scheme_application_type:
+    {
+      Scheme_App_Rec *app = (Scheme_App_Rec *)e;
+      int i;
+      for (i = 0; i < app->num_args + 1; i++) {
+        optimize_drop(app->args[i], info, !i, before_opt);
+      }
+    }
+    break;
+  case scheme_sequence_type:
+  case scheme_begin0_sequence_type:
+    {
+      Scheme_Sequence *seq = (Scheme_Sequence *)e;
+      int i;
+
+      for (i = 0; i < seq->count; i++) {
+        optimize_drop(seq->array[i], info, 0, before_opt);
+      }
+    }
+    break;
+  }
+  if (!before_opt
+      && !(OPT_BRANCH_ADDS_NO_SIZE
+           && SAME_TYPE(SCHEME_TYPE(e), scheme_branch_type))) {
+    info->size--;
+  }
 }
 
 static Scheme_Object *make_sequence_2(Scheme_Object *a, Scheme_Object *b)
@@ -3001,6 +3076,8 @@ static Scheme_Object *optimize_application(Scheme_Object *o, Optimize_Info *info
       ty = wants_local_type_arguments(app->args[0], i - 1);
       if (ty)
         sub_context |= (ty << OPT_CONTEXT_TYPE_SHIFT);
+    } else {
+      sub_context |= OPT_CONTEXT_RATOR;
     }
 
     optimize_info_seq_step(info, &info_seq);
@@ -3010,6 +3087,9 @@ static Scheme_Object *optimize_application(Scheme_Object *o, Optimize_Info *info
       int j;
       Scheme_Object *e, *l;
       optimize_info_seq_done(info, &info_seq);
+      if (!i)
+        return app->args[0];
+      from_rator_to_container(app->args[0]);
 
       l = scheme_make_pair(app->args[i], scheme_null);
 
@@ -3475,7 +3555,7 @@ static Scheme_Object *optimize_application2(Scheme_Object *o, Optimize_Info *inf
 
   optimize_info_seq_init(info, &info_seq);
 
-  sub_context = OPT_CONTEXT_SINGLED;
+  sub_context = OPT_CONTEXT_SINGLED | OPT_CONTEXT_RATOR;
 
   le = scheme_optimize_expr(app->rator, info, sub_context);
   app->rator = le;
@@ -3492,6 +3572,7 @@ static Scheme_Object *optimize_application2(Scheme_Object *o, Optimize_Info *inf
     rator_apply_escapes = info->escapes;
   }
 
+  sub_context = OPT_CONTEXT_SINGLED;
   if (SAME_PTR(scheme_not_proc, app->rator)){
     sub_context |= OPT_CONTEXT_BOOLEAN;
   } else {
@@ -3507,6 +3588,7 @@ static Scheme_Object *optimize_application2(Scheme_Object *o, Optimize_Info *inf
   optimize_info_seq_done(info, &info_seq);
   if (info->escapes) {
     info->size += 1;
+    from_rator_to_container(app->rator);
     return make_discarding_first_sequence(app->rator, app->rand, info);
   }
 
@@ -3836,7 +3918,7 @@ static Scheme_Object *optimize_application3(Scheme_Object *o, Optimize_Info *inf
 
   optimize_info_seq_init(info, &info_seq);
 
-  sub_context = OPT_CONTEXT_SINGLED;
+  sub_context = OPT_CONTEXT_SINGLED | OPT_CONTEXT_RATOR;
 
   le = scheme_optimize_expr(app->rator, info, sub_context);
   app->rator = le;
@@ -3859,6 +3941,7 @@ static Scheme_Object *optimize_application3(Scheme_Object *o, Optimize_Info *inf
 
   /* 1st arg */
 
+  sub_context = OPT_CONTEXT_SINGLED;
   ty = wants_local_type_arguments(app->rator, 0);
   if (ty)
     sub_context |= (ty << OPT_CONTEXT_TYPE_SHIFT);
@@ -3869,11 +3952,13 @@ static Scheme_Object *optimize_application3(Scheme_Object *o, Optimize_Info *inf
   app->rand1 = le;
   if (info->escapes) {
     info->size += 1;
+    from_rator_to_container(app->rator);
     return make_discarding_first_sequence(app->rator, app->rand1, info);
   }
 
   /* 2nd arg */
 
+  sub_context = OPT_CONTEXT_SINGLED;
   ty = wants_local_type_arguments(app->rator, 1);
   if (ty)
     sub_context |= (ty << OPT_CONTEXT_TYPE_SHIFT);
@@ -3887,6 +3972,7 @@ static Scheme_Object *optimize_application3(Scheme_Object *o, Optimize_Info *inf
   optimize_info_seq_done(info, &info_seq);
   if (info->escapes) {
     info->size += 1;
+    from_rator_to_container(app->rator);
     return make_discarding_first_sequence(app->rator,
                                           make_discarding_first_sequence(app->rand1, app->rand2,
                                                                          info),
@@ -4421,12 +4507,14 @@ static Scheme_Object *optimize_sequence(Scheme_Object *o, Optimize_Info *info, i
         
         single_result = info->single_result;
         preserves_marks = info->preserves_marks;
-        /* Move to last position in case the begin form is dropped */
-        s->array[count - 1] = le;
-        for (j = i; j < count - 1; j++) {
+        for (j = i + 1; j < count; j++) {
+          optimize_drop(s->array[j], info, 0, 1);
           drop++;
           s->array[j] = NULL;
         }
+        /* Move to last position in case the begin form is dropped */
+        s->array[count - 1] = le;
+        s->array[i] = NULL;
         break;
       }
     }
@@ -4838,13 +4926,15 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
 
   /* Convert (if <id> expr <id>) to (if <id> expr #f) */
   if (equivalent_exprs(t, fb, NULL, NULL, 0)) {
+    optimize_drop(fb, info, 0, 1);
     fb = scheme_false;
   }
   
   /* For test position, convert (if <id> <id> expr) to (if <id> #t expr) */
   if ((context & OPT_CONTEXT_BOOLEAN)
       && equivalent_exprs(t, tb, NULL, NULL, 0)) {
-      tb = scheme_true;
+    optimize_drop(tb, info, 0, 1);
+    tb = scheme_true;
   }
 
   optimize_info_seq_init(info, &info_seq);
@@ -4853,6 +4943,8 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
 
   if (info->escapes) {
     optimize_info_seq_done(info, &info_seq);
+    optimize_drop(tb, info, 0, 1);
+    optimize_drop(fb, info, 0, 1);
     return t;
   }
 
@@ -4910,11 +5002,13 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
       optimize_info_seq_done(info, &info_seq);
       info->size -= 1;
 
-      if (SCHEME_FALSEP(t2))
+      if (SCHEME_FALSEP(t2)) {
+        optimize_drop(tb, info, 0, 1);
         xb = scheme_optimize_expr(fb, info, scheme_optimize_tail_context(context));
-      else
+      } else {
+        optimize_drop(fb, info, 0, 1);
         xb = scheme_optimize_expr(tb, info, scheme_optimize_tail_context(context));
-      
+      }
       optimize_info_seq_done(info, &info_seq);
       return replace_tail_inside(xb, inside, t);
     }
@@ -5013,6 +5107,7 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
 
     nb = equivalent_exprs(tb, fb, then_info_init, else_info_init, context);
     if (nb) {
+      /* it would be nice to drop the other branch here */
       info->size -= 1;
       return make_discarding_first_sequence(t, nb, info);
     }
@@ -5023,7 +5118,8 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
      but this is still useful if x is mutable or a top level*/
   if (SCHEME_FALSEP(fb)
       && equivalent_exprs(t, tb, NULL, NULL, 0)) {
-      info->size -= 2;
+      info->size -= 1;
+      optimize_drop(tb, info, 0, 0);
       return t;
   }
 
@@ -5504,6 +5600,7 @@ static Scheme_Object *begin0_optimize(Scheme_Object *obj, Optimize_Info *info, i
       single_result = info->single_result;
       preserves_marks = info->preserves_marks;
       for (j = i + 1; j < count; j++) {
+        optimize_drop(s->array[j], info, 0, 1);
         drop++;
         s->array[j] = NULL;
       }
@@ -6358,39 +6455,12 @@ static Scheme_Object *optimize_lets(Scheme_Object *form, Optimize_Info *info, in
   Scheme_IR_Let_Header *head = (Scheme_IR_Let_Header *)form;
   Scheme_IR_Let_Value *irlv, *pre_body, *retry_start, *prev_body;
   Scheme_Object *body, *value, *ready_pairs = NULL, *rp_last = NULL, *ready_pairs_start;
-  Scheme_Once_Used *once_used;
   Scheme_Hash_Tree *merge_skip_vars;
   int i, j, is_rec, not_simply_let_star = 0, undiscourage, skip_opts = 0;
   int did_set_value, found_escapes;
   int remove_last_one = 0, inline_fuel;
   int pre_vclock, pre_aclock, pre_kclock, pre_sclock, increments_kclock = 0;
   int once_vclock, once_aclock, once_kclock, once_sclock, once_increments_kclock = 0;
-
-  if (context & OPT_CONTEXT_BOOLEAN) {
-    /* Special case: (let ([x M]) (if x x N)), where x is not in N,
-       to (if M #t N), since we're in a test position. */
-    if (!(SCHEME_LET_FLAGS(head) & SCHEME_LET_RECURSIVE) && (head->count == 1) && (head->num_clauses == 1)) {
-      irlv = (Scheme_IR_Let_Value *)head->body;
-      if (SAME_TYPE(SCHEME_TYPE(irlv->body), scheme_branch_type)
-          && (irlv->vars[0]->use_count == 2)) {
-        Scheme_Branch_Rec *b = (Scheme_Branch_Rec *)irlv->body;
-        if (SAME_OBJ(b->test, (Scheme_Object *)irlv->vars[0])
-            && SAME_OBJ(b->tbranch, (Scheme_Object *)irlv->vars[0])) {
-          Scheme_Branch_Rec *b3;
-
-          b3 = MALLOC_ONE_TAGGED(Scheme_Branch_Rec);
-          b3->so.type = scheme_branch_type;
-          b3->test = irlv->value;
-          b3->tbranch = scheme_true;
-          b3->fbranch = b->fbranch;
-
-          form = scheme_optimize_expr((Scheme_Object *)b3, info, context);
-
-          return form;
-        }
-      }
-    }
-  }
 
   is_rec = (SCHEME_LET_FLAGS(head) & SCHEME_LET_RECURSIVE);
 
@@ -6740,7 +6810,7 @@ static Scheme_Object *optimize_lets(Scheme_Object *form, Optimize_Info *info, in
         pre_body->vars[0]->optimize.known_val = value;
         did_set_value = 1;
       } else if (value && !is_rec) {
-        int cnt, ct, involves_k_cross;
+        int ct, involves_k_cross;
         Scheme_Object *pred;
 
         ct = scheme_expr_produces_local_type(value, &involves_k_cross);
@@ -6763,15 +6833,13 @@ static Scheme_Object *optimize_lets(Scheme_Object *form, Optimize_Info *info, in
           add_type(body_info, (Scheme_Object *)pre_body->vars[0], pred);
 
         if (!indirect) {
-          cnt = pre_body->vars[0]->use_count;
-          if (cnt == 1) {
-            /* used only once; we may be able to shift the expression to the use
-               site, instead of binding to a temporary */
-            once_used = make_once_used(value, pre_body->vars[0],
-                                       once_vclock, once_aclock, once_kclock, once_sclock,
-                                       once_increments_kclock);
-            pre_body->vars[0]->optimize.known_val = (Scheme_Object *)once_used;
-          }
+          Scheme_Once_Used *once_used;
+          /* we may be able to shift the expression to the use
+             site, instead of binding to a temporary */
+          once_used = make_once_used(value, pre_body->vars[0],
+                                     once_vclock, once_aclock, once_kclock, once_sclock,
+                                     once_increments_kclock);
+          pre_body->vars[0]->optimize.known_val = (Scheme_Object *)once_used;
         }
       }
     }
@@ -8187,6 +8255,7 @@ Scheme_Object *scheme_optimize_expr(Scheme_Object *expr, Optimize_Info *info, in
   case scheme_ir_local_type:
     {
       Scheme_Object *val;
+      int as_rator = !!(context & OPT_CONTEXT_RATOR);
 
       info->size += 1;
 
@@ -8198,15 +8267,18 @@ Scheme_Object *scheme_optimize_expr(Scheme_Object *expr, Optimize_Info *info, in
 
       val = optimize_info_propagate_local(expr);
       if (val) {
-        info->size -= 1;
+        optimize_drop(expr, info, as_rator, 1);
         return scheme_optimize_expr(val, info, context);
       }
 
       val = collapse_local(expr, info, context);
-      if (val)
+      if (val) {
+        optimize_drop(expr, info, as_rator, 1);
         return val;
+      }
 
-      if (!(context & OPT_CONTEXT_NO_SINGLE)) {
+      if (!(context & OPT_CONTEXT_NO_SINGLE)
+          && (SCHEME_VAR(expr)->use_count == 1)) {
         val = SCHEME_VAR(expr)->optimize.known_val;
       
         if (val && SAME_TYPE(SCHEME_TYPE(val), scheme_once_used_type)) {
@@ -8391,10 +8463,23 @@ static void increment_use_count(Scheme_IR_Local *var, int as_rator)
     var->use_count++;
   if (!as_rator && (var->non_app_count < SCHEME_USE_COUNT_INF))
     var->non_app_count++;
-  
-  if (var->optimize.known_val
-      && SAME_TYPE(SCHEME_TYPE(var->optimize.known_val), scheme_once_used_type))
-    var->optimize.known_val = NULL;
+}
+
+static void decrement_use_count(Scheme_IR_Local *var, int as_rator)
+{
+  if (var->use_count < SCHEME_USE_COUNT_INF)
+    var->use_count--;
+  if (!as_rator && (var->non_app_count < SCHEME_USE_COUNT_INF))
+    var->non_app_count--;
+}
+
+static void from_rator_to_container(Scheme_Object *e)
+{
+  if (SAME_TYPE(SCHEME_TYPE(e), scheme_ir_local_type)) {
+    Scheme_IR_Local *var = e;
+    if (var->non_app_count < SCHEME_USE_COUNT_INF)
+      var->non_app_count++;
+  }
 }
 
 Scheme_Object *optimize_clone(int single_use, Scheme_Object *expr, Optimize_Info *info, Scheme_Hash_Tree *var_map, int as_rator)

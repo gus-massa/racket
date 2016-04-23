@@ -8467,6 +8467,10 @@ static void increment_use_count(Scheme_IR_Local *var, int as_rator)
 
 static void decrement_use_count(Scheme_IR_Local *var, int as_rator)
 {
+  if ((var->use_count == 0)
+      || (var->use_count < var->non_app_count)
+      || ((var->non_app_count == 0) && !as_rator))
+    printf("[%d,%d,%d]", var->use_count, var->non_app_count, as_rator);
   if (var->use_count < SCHEME_USE_COUNT_INF)
     var->use_count--;
   if (!as_rator && (var->non_app_count < SCHEME_USE_COUNT_INF))
@@ -8475,8 +8479,10 @@ static void decrement_use_count(Scheme_IR_Local *var, int as_rator)
 
 static void from_rator_to_container(Scheme_Object *e)
 {
+  printf("[!]");
   if (SAME_TYPE(SCHEME_TYPE(e), scheme_ir_local_type)) {
     Scheme_IR_Local *var = e;
+    printf("[%d,%d,!]", var->use_count, var->non_app_count);
     if (var->non_app_count < SCHEME_USE_COUNT_INF)
       var->non_app_count++;
   }

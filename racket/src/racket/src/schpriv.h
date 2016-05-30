@@ -35,9 +35,9 @@
 #define HOOK_SHARED_OK /* EMPTY */
 #endif
 
-#ifdef OS_X
+//#ifdef OS_X
 # define MZ_CHECK_ASSERTS
-#endif
+//#endif
 
 #ifdef MZ_CHECK_ASSERTS
 # include <assert.h>

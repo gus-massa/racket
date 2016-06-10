@@ -842,11 +842,13 @@ static void optimize_drop(Scheme_Object *e, Optimize_Info *info, int as_rator, i
 {
   switch (SCHEME_TYPE(e)) {
   case scheme_ir_local_type:
+  //return;
     {
       decrement_use_count(SCHEME_VAR(e), as_rator);
     }
     break;
   case scheme_application2_type:
+  //return;
     {
       Scheme_App2_Rec *app = (Scheme_App2_Rec *)e;
       optimize_drop(app->rator, info, 1, before_opt);
@@ -854,6 +856,7 @@ static void optimize_drop(Scheme_Object *e, Optimize_Info *info, int as_rator, i
     }
     break;
   case scheme_application3_type:
+  //return;
     {
       Scheme_App3_Rec *app = (Scheme_App3_Rec *)e;
       optimize_drop(app->rator, info, 1, before_opt);
@@ -862,6 +865,7 @@ static void optimize_drop(Scheme_Object *e, Optimize_Info *info, int as_rator, i
     }
     break;
   case scheme_application_type:
+  //return;
     {
       Scheme_App_Rec *app = (Scheme_App_Rec *)e;
       int i;
@@ -872,6 +876,7 @@ static void optimize_drop(Scheme_Object *e, Optimize_Info *info, int as_rator, i
     break;
   case scheme_sequence_type:
   case scheme_begin0_sequence_type:
+  //return;
     {
       Scheme_Sequence *seq = (Scheme_Sequence *)e;
       int i;
@@ -6836,10 +6841,11 @@ static Scheme_Object *optimize_lets(Scheme_Object *form, Optimize_Info *info, in
           Scheme_Once_Used *once_used;
           /* we may be able to shift the expression to the use
              site, instead of binding to a temporary */
+          printf("{OU:%d}", pre_body->vars[0]->use_count);
           once_used = make_once_used(value, pre_body->vars[0],
                                      once_vclock, once_aclock, once_kclock, once_sclock,
                                      once_increments_kclock);
-          pre_body->vars[0]->optimize.known_val = (Scheme_Object *)once_used;
+          //pre_body->vars[0]->optimize.known_val = (Scheme_Object *)once_used;
         }
       }
     }
@@ -6964,8 +6970,8 @@ static Scheme_Object *optimize_lets(Scheme_Object *form, Optimize_Info *info, in
             int i;
             for (i = irlv->count; i--; ) {
               if (!irlv->vars[i]->mutated) {
-                SCHEME_VAR(SCHEME_CAR(ready_pairs_start))->optimize_unready = 0;
-                ready_pairs_start = SCHEME_CDR(ready_pairs_start);
+                //SCHEME_VAR(SCHEME_CAR(ready_pairs_start))->optimize_unready = 0;
+                //ready_pairs_start = SCHEME_CDR(ready_pairs_start);
               }
             }
           }
@@ -6998,8 +7004,8 @@ static Scheme_Object *optimize_lets(Scheme_Object *form, Optimize_Info *info, in
       for (i = pre_body->count; i--; ) {
         pre_body->vars[i]->optimize.init_kclock = rhs_info->kclock;
         if (!pre_body->vars[i]->mutated) {
-          SCHEME_VAR(SCHEME_CAR(ready_pairs))->optimize_unready = 0;
-          ready_pairs = SCHEME_CDR(ready_pairs);
+          //SCHEME_VAR(SCHEME_CAR(ready_pairs))->optimize_unready = 0;
+          //ready_pairs = SCHEME_CDR(ready_pairs);
         }
       }
     }
@@ -8267,8 +8273,8 @@ Scheme_Object *scheme_optimize_expr(Scheme_Object *expr, Optimize_Info *info, in
 
       val = optimize_info_propagate_local(expr);
       if (val) {
-        optimize_drop(expr, info, as_rator, 1);
-        return scheme_optimize_expr(val, info, context);
+        //optimize_drop(expr, info, as_rator, 1);
+        //return scheme_optimize_expr(val, info, context);
       }
 
       val = collapse_local(expr, info, context);
@@ -8278,7 +8284,7 @@ Scheme_Object *scheme_optimize_expr(Scheme_Object *expr, Optimize_Info *info, in
       }
 
       if (!(context & OPT_CONTEXT_NO_SINGLE)
-          && (SCHEME_VAR(expr)->use_count == 1)) {
+          && (SCHEME_VAR(expr)->use_count == 1 * -7)) {
         val = SCHEME_VAR(expr)->optimize.known_val;
       
         if (val && SAME_TYPE(SCHEME_TYPE(val), scheme_once_used_type)) {
@@ -8473,8 +8479,8 @@ static void decrement_use_count(Scheme_IR_Local *var, int as_rator)
     printf("[%d,%d,%d]", var->use_count, var->non_app_count, as_rator);
   if (var->use_count < SCHEME_USE_COUNT_INF)
     var->use_count--;
-  if (!as_rator && (var->non_app_count < SCHEME_USE_COUNT_INF))
-    var->non_app_count--;
+  //if (!as_rator && (var->non_app_count < SCHEME_USE_COUNT_INF))
+    //var->non_app_count--;
 }
 
 static void from_rator_to_container(Scheme_Object *e)

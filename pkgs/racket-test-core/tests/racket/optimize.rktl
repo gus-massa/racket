@@ -10,22 +10,23 @@
          racket/unsafe/ops
          compiler/zo-parse
          compiler/zo-marshal
-         ;; `random` from `racket/base is a Racket function, which makes
-         ;; compilation less predictable than a primitive
-         (only-in '#%kernel random
-                            (list-pair? k:list-pair?)))
+         (prefix-in k: '#%kernel))
+         ;; Some primitives like `random` are shadowed by Racket functions in
+         ;; `racket/base` and other modules. Using the primitive makes the
+         ;; compilation more predictable and removes the reference to the
+         ;; external modules in the functions.
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; Check JIT inlining of primitives:
 (parameterize ([current-namespace (make-base-namespace)]
-	       [eval-jit-enabled #t])
+               [eval-jit-enabled #t])
   (namespace-require 'racket/flonum)
   (namespace-require 'racket/extflonum)
   (namespace-require 'racket/fixnum)
   (namespace-require 'racket/unsafe/ops)
   (namespace-require 'racket/unsafe/undefined)
-  (namespace-require '(rename '#%kernel k:list-pair? list-pair?))
+  (namespace-require '(prefix k: '#%kernel))
   (eval '(define-values (prop:thing thing? thing-ref) 
            (make-struct-type-property 'thing)))
   (eval '(struct rock (x) #:property prop:thing 'yes))
@@ -927,7 +928,7 @@
 (test-comp 5 '(begin0 (begin0 5 'hi "apple" 1.5)))
 (test-comp 5 '(begin0 (begin0 5 'hi "apple") 1.5))
 
-; Can't drop `begin0' if the first expresson is may change cotinuation marks:
+; Can't drop `begin0' if the first expression is may change continuation marks:
 (test-comp '(lambda () 3)
            '(lambda () (begin0 (begin0 (+ 1 2) 'hi "apple") 1.5)))
 (test-comp '(lambda () (let ([sum +]) (begin0 (begin0 (+ 1 2) 'hi "apple") 1.5)))
@@ -1011,8 +1012,6 @@
 
 (test-comp (normalize-depth '(let* ([i (display 0 1)][g i][h (car g)][m h]) m))
 	   (normalize-depth '(let* ([i (display 0 1)][h (car i)]) h)))
-
-; (require #%kernel) ; 
 
 (test-comp (void) '(void))
 (test-comp 3 '(+ 1 2))
@@ -1341,42 +1340,42 @@
            '(lambda (z) (let ([f (lambda (i) (car i))]) (f z)) (pair? z)))
 
 ; Test the map primitive instead of the redefined version in private/map.rkt 
-(test-comp '(module ? '#%kernel
-              (display #t)
-              (display (lambda (f l) (map f l) #t)))
-           '(module ? '#%kernel
-              (display (primitive? map))
-              (display (lambda (f l) (map f l) (procedure? f)))))
+(test-comp '(list
+              #t
+              (lambda (f l) (k:map f l) #t))
+           '(list
+              (primitive? k:map)
+              (lambda (f l) (k:map f l) (procedure? f))))
 
 ; Test the map version in private/map.rkt
-(test-comp '(module ? racket/base
-              #;(display #f)
-              (display (lambda (f l) (map f l) #t)))
-           '(module ? racket/base
-              #;(display (primitive? map))
-              (display (lambda (f l) (map f l) (procedure? f)))))
+(test-comp '(list
+              #;#f
+              (lambda (f l) (map f l) #t))
+           '(list
+              #;(primitive? map)
+              (lambda (f l) (map f l) (procedure? f))))
 
-(test-comp '(lambda (w z) (vector? (list->vector w)))
-           '(lambda (w z) (list->vector w) #t))
-(test-comp '(lambda (w z) (vector? (struct->vector w)))
-           '(lambda (w z) (struct->vector w) #t))
-(test-comp '(lambda (w z) (vector? (struct->vector w z)))
-           '(lambda (w z) (struct->vector w z) #t))
+(test-comp '(lambda (w z) (vector? (k:list->vector w)))
+           '(lambda (w z) (k:list->vector w) #t))
+(test-comp '(lambda (w z) (vector? (k:struct->vector w)))
+           '(lambda (w z) (k:struct->vector w) #t))
+(test-comp '(lambda (w z) (vector? (k:struct->vector w z)))
+           '(lambda (w z) (k:struct->vector w z) #t))
 
-(test-comp '(lambda (w z) (vector? (make-vector (w) (z))))
-           '(lambda (w z) (make-vector (w) (z)) #t))
-(test-comp '(lambda (w z) (vector? (make-vector (w))))
-           '(lambda (w z) (make-vector (w)) #t))
-(test-comp '(lambda (w z) (vector? (make-vector 5 (z))))
+(test-comp '(lambda (w z) (vector? (k:make-vector (w) (z))))
+           '(lambda (w z) (k:make-vector (w) (z)) #t))
+(test-comp '(lambda (w z) (vector? (k:make-vector (w))))
+           '(lambda (w z) (k:make-vector (w)) #t))
+(test-comp '(lambda (w z) (vector? (k:make-vector 5 (z))))
            '(lambda (w z) (values (z)) #t))
-#;(test-comp '(lambda (w z) (vector? (make-vector 5 w)))
+#;(test-comp '(lambda (w z) (vector? (k:make-vector 5 w)))
            '(lambda (w z) #t))
-(test-comp '(lambda (w z) (vector? (make-vector 5)))
+(test-comp '(lambda (w z) (vector? (k:make-vector 5)))
            '(lambda (w z) #t))
-(test-comp '(lambda (w z) (vector? (make-vector -1)))
+(test-comp '(lambda (w z) (vector? (k:make-vector -1)))
            '(lambda (w z) #t)
            #f)
-(test-comp '(lambda (w z) (vector? (make-vector #f)))
+(test-comp '(lambda (w z) (vector? (k:make-vector #f)))
            '(lambda (w z) #t)
            #f)
 
@@ -1558,17 +1557,17 @@
            #f)
 
 (test-comp '(lambda (w) (car w) (mcar w))
-           '(lambda (w) (car w) (mcar w) (random)))
+           '(lambda (w) (car w) (mcar w) (k:random)))
 (test-comp '(lambda (w) (car w w))
-           '(lambda (w) (car w w) (random)))
+           '(lambda (w) (car w w) (k:random)))
 (test-comp '(lambda (w) (car w w w))
-           '(lambda (w) (car w w w) (random)))
+           '(lambda (w) (car w w w) (k:random)))
 (test-comp '(lambda (w) (cons w))
-           '(lambda (w) (cons w) (random)))
+           '(lambda (w) (cons w) (k:random)))
 (test-comp '(lambda (w) (cons))
-           '(lambda (w) (cons) (random)))
+           '(lambda (w) (cons) (k:random)))
 
-; test for unary aplications
+; test for unary applications
 (test-comp -1
            '(- 1))
 (test-comp '(lambda (f) (begin (f) -1))
@@ -1591,11 +1590,11 @@
            '(lambda () (cdr (cons (random 1) (random 2)))))
 
 (test-comp '(lambda () (begin (random 1) (random 2) (random 3) (random 4)))
-           '(lambda () (begin (car (cons (random 1) (random 2))) (random 3) (random 4)))) ;
+           '(lambda () (begin (car (cons (random 1) (random 2))) (random 3) (random 4))))
 (test-comp '(lambda () (begin (random 1) (random 2) (random 3) (random 4)))
            '(lambda () (begin (cdr (cons (random 1) (random 2))) (random 3) (random 4))))
 (test-comp '(lambda () (begin (random 1) (random 2) (random 3) (random 4)))
-           '(lambda () (begin (random 1) (car (cons (random 2) (random 3))) (random 4)))) ;
+           '(lambda () (begin (random 1) (car (cons (random 2) (random 3))) (random 4))))
 (test-comp '(lambda () (begin (random 1) (random 2) (random 3) (random 4)))
            '(lambda () (begin (random 1) (cdr (cons (random 2) (random 3))) (random 4))))
 (test-comp '(lambda () (begin (random 1) (random 2) (begin0 (random 3) (random 4))))
@@ -1608,11 +1607,11 @@
 (test-comp '(lambda () (begin0 (begin (random 1) (random 2)) (random 3) (random 4)))
            '(lambda () (begin0 (cdr (cons (random 1) (random 2))) (random 3) (random 4))))
 (test-comp '(lambda () (begin0 (random 1) (random 2) (random 3) (random 4)))
-           '(lambda () (begin0 (random 1) (car (cons (random 2) (random 3))) (random 4)))) ;
+           '(lambda () (begin0 (random 1) (car (cons (random 2) (random 3))) (random 4))))
 (test-comp '(lambda () (begin0 (random 1) (random 2) (random 3) (random 4)))
            '(lambda () (begin0 (random 1) (cdr (cons (random 2) (random 3))) (random 4))))
 (test-comp '(lambda () (begin0 (random 1) (random 2) (random 3) (random 4)))
-           '(lambda () (begin0 (random 1) (random 2) (car (cons (random 3) (random 4)))))) ;
+           '(lambda () (begin0 (random 1) (random 2) (car (cons (random 3) (random 4))))))
 (test-comp '(lambda () (begin0 (random 1) (random 2) (random 3) (random 4)))
            '(lambda () (begin0 (random 1) (random 2) (cdr (cons (random 3) (random 4))))))
 
@@ -4117,18 +4116,18 @@
 (test-comp '(lambda () (random) (error 'error))
            '(lambda () (random) (error 'error) 5))
 (test-comp '(lambda () (random) (error 'error))
-           '(lambda () (random) (error 'error) (random) 5))
+           '(lambda () (random) (error 'error) (k:random) 5))
 (test-comp '(lambda () (error 'error))
            '(lambda () 5 (error 'error) 5))
 (test-comp '(lambda (f) (f) (f) (error 'error))
            '(lambda (f) (f) (f) (error 'error) (f)))
 
 (test-comp '(lambda (f) (begin0 (f) (random) (error 'error)))
-           '(lambda (f) (begin0 (f) (random) (error 'error) (random) (f))))
+           '(lambda (f) (begin0 (f) (random) (error 'error) (k:random) (f))))
 (test-comp '(lambda (f) (error 'error))
-           '(lambda (f) (begin0 (error 'error) (random) (f))))
+           '(lambda (f) (begin0 (error 'error) (k:random) (f))))
 (test-comp '(lambda (f) (error 'error))
-           '(lambda (f) (begin0 7 (error 'error) (random) (f))))
+           '(lambda (f) (begin0 7 (error 'error) (k:random) (f))))
 
 (test-comp '(lambda (n)
               (let ([p (begin (error 'error) (fl+ n n))])
@@ -4225,13 +4224,13 @@
 (test-comp '(lambda (f) (let ([x (error 'error)]) #f))
            '(lambda (f) (let ([x (error 'error)]) (f x x)) 5))
 (test-comp '(lambda (f) (let ([x (error 'error)] [y #f]) #f))
-           '(lambda (f) (let ([x (error 'error)] [y (random)]) (f x x y y)) 5))
+           '(lambda (f) (let ([x (error 'error)] [y (k:random)]) (f x x y y)) 5))
 (test-comp '(lambda (f) (let ([x (random)] [y (random)]) (f x x y y) (error 'error)))
            '(lambda (f) (let ([x (random)] [y (random)]) (f x x y y) (error 'error)) 5))
 (test-comp '(lambda (f) (let-values ([(x) (error 'error)] [(y) #f] [(z) #f] ) #f))
            '(lambda (f) (let-values ([(x) (error 'error)] [(y z) (f)]) (f x x y y z z)) 5))
 (test-comp '(lambda (f) (let-values ([(x) (error 'error)] [(y) #f] [(z) #f]) #f))
-           '(lambda (f) (let-values ([(x y) (values (error 'error) (random))] [(z) (f)]) (f x x y y z z)) 5))
+           '(lambda (f) (let-values ([(x y) (values (error 'error) (k:random))] [(z) (f)]) (f x x y y z z)) 5))
 (test-comp '(lambda (f) (let-values ([(x) (begin (random) (error 'error))] [(y) #f] [(z) #f]) #f))
            '(lambda (f) (let-values ([(x y) (values (random) (error 'error))] [(z) (f)]) (f x x y y z z)) 5))
 ;alternative reduction:
@@ -4503,7 +4502,7 @@
 (err/rt-test (cwv-2-5-f (lambda () (values 1 2 3)) (lambda (y z) (+ y 2))) exn:fail:contract:arity?)
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Transform call-with-values to direct aplication:
+;; Transform call-with-values to direct application:
 (test-comp '(lambda (f) (f 7))
            '(lambda (f) (call-with-values (lambda () 7) (lambda (x) (f x)))))
 (test-comp '(lambda () (car 7))
@@ -4686,7 +4685,7 @@
         #f))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Make sure the compiler doesn't end up in an infinite inling loop:
+;; Make sure the compiler doesn't end up in an infinite inlining loop:
 
 (module unc-small-self-call racket/base
   (define unc1
@@ -4862,7 +4861,7 @@
 ;; Check for correct fixpoint calculation when lifting
 
 ;; This test is especially fragile. It's a minimized(?) variant
-;; of PR 12910, where just enbought `with-continuation-mark's
+;; of PR 12910, where just enough `with-continuation-mark's
 ;; are needed to thwart inlining, and enough functions are 
 ;; present in the right order to require enough fixpoint
 ;; iterations.
@@ -5070,7 +5069,7 @@
   (test 'ok (lambda () (analyze-beg0 m))))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; make sure `begin0' propertly propagates "multiple results" flags
+;; make sure `begin0' properly propagates "multiple results" flags
 
 (test '(1 2 3) (lambda ()
                  (call-with-values
@@ -5080,7 +5079,7 @@
                    list)))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Make sure compiler isn't too agressive for the validator
+;; Make sure compiler isn't too aggressive for the validator
 ;;  in terms of typed arguments:
 
 (let ([m '(module m racket/base
@@ -5407,7 +5406,7 @@
     (eval (read (open-input-bytes (get-output-bytes o))))))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Check interaciton of 3-D macros, non-empty closures, JIT, and bytecode:
+;; Check interaction of 3-D macros, non-empty closures, JIT, and bytecode:
 
 (let ([o (open-output-bytes)])
   (write (compile
@@ -5460,7 +5459,7 @@
         (check pred t1 e1)))))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Check unboxing with mutual recusion:
+;; Check unboxing with mutual recursion:
 
 (let ()
   ;; Literal lists thwart inlining:
@@ -5539,7 +5538,7 @@
           (read (open-input-bytes (get-output-bytes o))))))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Check that an unsafe opertion's argument is
+;; Check that an unsafe operation's argument is
 ;; not "optimized" away if it's a use of
 ;; a variable before definition:
 

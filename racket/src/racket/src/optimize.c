@@ -3378,8 +3378,8 @@ static Scheme_Object *finish_optimize_application(Scheme_App_Rec *app, Optimize_
       check_known(info, app_o, rator, rand1, "andmap", scheme_procedure_p_proc, NULL);
       check_known(info, app_o, rator, rand1, "ormap", scheme_procedure_p_proc, NULL);
 
-      check_known_all(info, app_o, "string-append", scheme_string_p_proc, scheme_true);
-      check_known_all(info, app_o, "bytes-append", scheme_byte_string_p_proc, scheme_true);
+      check_known_all(info, app_o, "string-append", scheme_string_p_proc, NULL);
+      check_known_all(info, app_o, "bytes-append", scheme_byte_string_p_proc, NULL);
       check_known(info, app_o, rator, rand1, "string-set!", scheme_string_p_proc, NULL);
       check_known(info, app_o, rator, rand1, "bytes-set!", scheme_byte_string_p_proc, NULL);
 
@@ -3806,8 +3806,8 @@ static Scheme_Object *finish_optimize_application2(Scheme_App2_Rec *app, Optimiz
       check_known(info, app_o, rator, rand, "unsafe-unbox*", scheme_box_p_proc, NULL);
       check_known(info, app_o, rator, rand, "vector-length", scheme_vector_p_proc, scheme_unsafe_vector_length_proc);
 
-      check_known(info, app_o, rator, rand, "string-append", scheme_string_p_proc, scheme_true);
-      check_known(info, app_o, rator, rand, "bytes-append", scheme_byte_string_p_proc, scheme_true);
+      check_known(info, app_o, rator, rand, "string-append", scheme_string_p_proc, NULL);
+      check_known(info, app_o, rator, rand, "bytes-append", scheme_byte_string_p_proc, NULL);
 
       if (SCHEME_PRIM_PROC_OPT_FLAGS(rator) & SCHEME_PRIM_WANTS_REAL)
         check_known(info, app_o, rator, rand, NULL, scheme_real_p_proc,
@@ -4251,8 +4251,8 @@ static Scheme_Object *finish_optimize_application3(Scheme_App3_Rec *app, Optimiz
 
     rator = app->rator; /* in case it was updated */
 
-    check_known_both(info, app_o, rator, rand1, rand2, "string-append", scheme_string_p_proc, scheme_true);
-    check_known_both(info, app_o, rator, rand1, rand2, "bytes-append", scheme_byte_string_p_proc, scheme_true);
+    check_known_both(info, app_o, rator, rand1, rand2, "string-append", scheme_string_p_proc, NULL);
+    check_known_both(info, app_o, rator, rand1, rand2, "bytes-append", scheme_byte_string_p_proc, NULL);
     check_known(info, app_o, rator, rand1, "string-ref", scheme_string_p_proc, NULL);
     check_known(info, app_o, rator, rand1, "bytes-ref", scheme_byte_string_p_proc, NULL);
 

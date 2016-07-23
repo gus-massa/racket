@@ -550,6 +550,7 @@ extern Scheme_Object *scheme_unsafe_fxxor_proc;
 extern Scheme_Object *scheme_unsafe_fxrshift_proc;
 
 extern Scheme_Object *scheme_string_p_proc;
+extern Scheme_Object *scheme_string_eq_proc;
 extern Scheme_Object *scheme_unsafe_string_length_proc;
 extern Scheme_Object *scheme_byte_string_p_proc;
 extern Scheme_Object *scheme_unsafe_byte_string_length_proc;

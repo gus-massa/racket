@@ -4243,6 +4243,20 @@ static Scheme_Object *finish_optimize_application3(Scheme_App3_Rec *app, Optimiz
     }
   }
 
+  if (SAME_OBJ(app->rator, scheme_equal_proc)) {
+    Scheme_Object *pred1, *pred2;
+    pred1 = expr_implies_predicate(app->rand1, info);
+    pred2 = expr_implies_predicate(app->rand2, info);
+    if (pred1 && pred2) {
+      if (predicate_implies(pred1, scheme_string_p_proc)
+          && predicate_implies(pred2, scheme_string_p_proc)) {
+        app->rator = scheme_string_eq_proc;
+        SCHEME_APPN_FLAGS(app) |= (APPN_FLAG_IMMED | APPN_FLAG_SFS_TAIL);
+        scheme_check_leaf_rator(scheme_string_eq_proc, &rator_flags);
+      }
+    }
+  }
+
   info->preserves_marks = !!(rator_flags & LAMBDA_PRESERVES_MARKS);
   info->single_result = !!(rator_flags & LAMBDA_SINGLE_RESULT);
   if (rator_flags & LAMBDA_RESULT_TENTATIVE) {
@@ -4393,6 +4407,7 @@ static Scheme_Object *finish_optimize_application3(Scheme_App3_Rec *app, Optimiz
     rator = app->rator; /* in case it was updated */
 
     check_known_both(info, app_o, rator, rand1, rand2, "string-append", scheme_string_p_proc, scheme_true);
+    check_known_both(info, app_o, rator, rand1, rand2, "string=?", scheme_string_p_proc, scheme_true);
     check_known_both(info, app_o, rator, rand1, rand2, "bytes-append", scheme_byte_string_p_proc, scheme_true);
     check_known(info, app_o, rator, rand1, "string-ref", scheme_string_p_proc, NULL);
     check_known(info, app_o, rator, rand2, "string-ref", scheme_fixnum_p_proc, NULL);

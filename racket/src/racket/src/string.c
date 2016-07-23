@@ -394,6 +394,7 @@ READ_ONLY static Scheme_Object *complete_symbol, *continues_symbol, *aborts_symb
 
 READ_ONLY Scheme_Object *scheme_string_p_proc;
 READ_ONLY Scheme_Object *scheme_byte_string_p_proc;
+READ_ONLY Scheme_Object *scheme_string_eq_proc;
 
 void
 scheme_init_string (Scheme_Env *env)
@@ -518,9 +519,11 @@ scheme_init_string (Scheme_Env *env)
   SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(SCHEME_PRIM_IS_NARY_INLINED);
   scheme_add_global_constant("string-set!", p, env);
 
+  REGISTER_SO(scheme_string_eq_proc);
   p = scheme_make_immed_prim(string_eq, "string=?", 2, -1);
   SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(SCHEME_PRIM_IS_BINARY_INLINED);
   scheme_add_global_constant("string=?", p, env);
+  scheme_string_eq_proc = p;
 
   scheme_add_global_constant("string-locale=?",
 			     scheme_make_immed_prim(string_locale_eq,

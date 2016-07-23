@@ -1123,6 +1123,22 @@
   (test-equal? 'eqv?)
   (test-equal? 'equal?))
 
+(test-comp '(lambda (x y) (when (and (string? x) (string? y))
+                            (equal? x y)))
+           '(lambda (x y) (when (and (string? x) (string? y))
+                            (string=? x y))))
+(test-comp '(lambda (x y) (when (and (string? x) (string? y))
+                            (eqv? x y)))
+           '(lambda (x y) (when (and (string? x) (string? y))
+                            (string=? x y)))
+           #f)
+(test-comp '(lambda (x y) (when (and (string? x) (string? y))
+                            (eq? x y)))
+           '(lambda (x y) (when (and (string? x) (string? y))
+                            (string=? x y)))
+           #f)
+
+
 (test-comp '(let ([x 3]) x)
 	   '((lambda (x) x) 3))
 (test-comp '(let ([x 3][y 4]) (+ x y))

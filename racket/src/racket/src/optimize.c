@@ -4255,6 +4255,94 @@ static Scheme_Object *finish_optimize_application3(Scheme_App3_Rec *app, Optimiz
         scheme_check_leaf_rator(scheme_string_eq_proc, &rator_flags);
       }
     }
+    if (pred2 && predicate_implies(pred2, scheme_string_p_proc)) {
+        /* Transform
+             (equal? <expr1> <string2>)
+           to
+             (let ([v1 <expr1>]
+                   [v2 <string2>])
+               (if (string? v1)
+                 (string=? v1 v2)
+                 #f))
+        */
+
+        Scheme_IR_Let_Header *lh;
+        Scheme_IR_Let_Value *lv1, *lv2;
+        Scheme_IR_Local *var1, *var2;
+        Scheme_IR_Local **vars1, **vars2;
+        Scheme_Branch_Rec *b;
+        Scheme_App2_Rec *app2;
+        Scheme_Object *rand1, *rand2;
+
+        printf ("<*************************************************>\n");
+
+        var1 = MALLOC_ONE_TAGGED(Scheme_IR_Local);
+        var1->so.type = scheme_ir_local_type;
+        set_optimize_mode(var1);
+        var1->use_count = 2;
+        var1->non_app_count = 2;
+        var1->optimize_used = 1;
+        var1->escapes_after_k_tick = 1; /* just in case expr2 saves a continuation */
+        var1->optimize.lambda_depth = info->lambda_depth;
+        var1->optimize_used = 0;
+        var1->optimize.init_kclock = info->kclock - 1; /* the kclock value is erased, is this right? */
+
+        var2 = MALLOC_ONE_TAGGED(Scheme_IR_Local);
+        var2->so.type = scheme_ir_local_type;
+        set_optimize_mode(var1);
+        var2->use_count = 1;
+        var2->non_app_count = 1;
+        var2->optimize_used = 1;
+        var2->escapes_after_k_tick = 0;
+        var2->optimize.lambda_depth = info->lambda_depth;
+        var2->optimize_used = 0;
+        var2->optimize.init_kclock = info->kclock;
+
+        rand1 = app->rand1;
+        rand2 = app->rand2;
+        app->rator = scheme_string_eq_proc;
+        SCHEME_APPN_FLAGS(app) |= (APPN_FLAG_IMMED | APPN_FLAG_SFS_TAIL);
+        app->rand1 = var1;
+        app->rand2 = var2;
+
+        app2 = MALLOC_ONE_TAGGED(Scheme_App2_Rec);
+        app2->iso.so.type = scheme_application2_type;
+        app2->rator = scheme_string_p_proc;
+        SCHEME_APPN_FLAGS(app2) |= (APPN_FLAG_IMMED | APPN_FLAG_SFS_TAIL);
+        app2->rand = var1;
+
+        b = MALLOC_ONE_TAGGED(Scheme_Branch_Rec);
+        b->so.type = scheme_branch_type;
+        b->test = app2;
+        b->tbranch = app;        
+        b->fbranch = scheme_false;
+
+        vars2 = MALLOC_N(Scheme_IR_Local*, 1);
+        vars2[0] = var2;
+        lv2 = MALLOC_ONE_TAGGED(Scheme_IR_Let_Value);
+        lv2->iso.so.type = scheme_ir_let_value_type;
+        lv2->count = 1;
+        lv2->vars = vars2;
+        lv2->value = rand2;
+        lv2->body = b;
+
+        vars1 = MALLOC_N(Scheme_IR_Local*, 1);
+        vars1[0] = var1;
+        lv1 = MALLOC_ONE_TAGGED(Scheme_IR_Let_Value);
+        lv1->iso.so.type = scheme_ir_let_value_type;
+        lv1->count = 1;
+        lv1->vars = vars1;
+        lv1->value = rand1;
+        lv1->body = lv2;
+
+        lh = MALLOC_ONE_TAGGED(Scheme_IR_Let_Header);
+        lh->iso.so.type = scheme_ir_let_header_type;
+        lh->count = 2;
+        lh->num_clauses = 2;
+        lh->body = lv1;
+ 
+        return lh;
+    }
   }
 
   info->preserves_marks = !!(rator_flags & LAMBDA_PRESERVES_MARKS);

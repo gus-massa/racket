@@ -41,6 +41,7 @@ READ_ONLY Scheme_Object *scheme_equal_proc;
 
 /* locals */
 static Scheme_Object *not_prim (int argc, Scheme_Object *argv[]);
+static Scheme_Object *strict_true_p_prim (int argc, Scheme_Object *argv[]);
 static Scheme_Object *boolean_p_prim (int argc, Scheme_Object *argv[]);
 static Scheme_Object *eq_prim (int argc, Scheme_Object *argv[]);
 static Scheme_Object *eqv_prim (int argc, Scheme_Object *argv[]);
@@ -94,6 +95,10 @@ void scheme_init_bool (Scheme_Env *env)
                                                             | SCHEME_PRIM_IS_OMITABLE);
   scheme_add_global_constant("not", p, env);
 
+  p = scheme_make_folding_prim(strict_true_p_prim, "strict-true?", 1, 1, 1);
+  SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(SCHEME_PRIM_IS_OMITABLE);
+  scheme_add_global_constant("strict-true?", p, env);
+
   p = scheme_make_folding_prim(boolean_p_prim, "boolean?", 1, 1, 1);
   SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(SCHEME_PRIM_IS_UNARY_INLINED
                                                             | SCHEME_PRIM_IS_OMITABLE);
@@ -145,6 +150,12 @@ static Scheme_Object *
 not_prim (int argc, Scheme_Object *argv[])
 {
   return (SAME_OBJ(argv[0], scheme_false) ? scheme_true : scheme_false);
+}
+
+static Scheme_Object *
+strict_true_p_prim (int argc, Scheme_Object *argv[])
+{
+  return (SAME_OBJ(argv[0], scheme_true) ? scheme_true : scheme_false);
 }
 
 static Scheme_Object *

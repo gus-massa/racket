@@ -96,7 +96,8 @@ void scheme_init_bool (Scheme_Env *env)
   scheme_add_global_constant("not", p, env);
 
   p = scheme_make_folding_prim(strict_true_p_prim, "strict-true?", 1, 1, 1);
-  SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(SCHEME_PRIM_IS_OMITABLE);
+  SCHEME_PRIM_PROC_FLAGS(p) |= scheme_intern_prim_opt_flags(SCHEME_PRIM_IS_UNARY_INLINED
+                                                            | SCHEME_PRIM_IS_OMITABLE);
   scheme_add_global_constant("strict-true?", p, env);
 
   p = scheme_make_folding_prim(boolean_p_prim, "boolean?", 1, 1, 1);

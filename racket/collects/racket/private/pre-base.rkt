@@ -234,6 +234,7 @@
                               list-pair?
                               strict-true?
                               random)
+             (rename strict-true? ugly-strict-true?)
              (all-from "reqprov.rkt")
              (all-from-except "for.rkt"
                               define-in-vector-like

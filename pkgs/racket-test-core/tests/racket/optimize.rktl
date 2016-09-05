@@ -2046,6 +2046,13 @@
            '(lambda (x) (let ([n (if (zero? (random 2)) 1 -1)])
                           (list n n #f))))
 
+; Test reductions in expressions that are similar to the expansion of `or`
+(test-comp '(lambda (z)
+              (when (boolean? z)
+                (if z z 0)))
+           '(lambda (z)
+              (when (boolean? z)
+                (if z #t 0))))
 (test-comp '(lambda (x) (if (let ([r (something)])
                               (if r r (something-else)))
                             (a1)
@@ -3108,6 +3115,8 @@
   (test-implies 'k:list-pair? 'pair?)
   (test-implies 'k:list-pair? 'list?)
   (test-implies 'list? 'pair? '?)
+  (test-implies 'not 'boolean?)
+  (test-implies 'k:strict-true? 'boolean?)
 )
 
 (test-comp '(lambda (z)
@@ -3142,7 +3151,23 @@
               (when (and (list? z)
                          (not (k:list-pair? z)))
                 #t)))
-                      
+(test-comp '(lambda (z)
+              (when (and (boolean? z)
+                         (not (k:strict-true? z)))
+                (not z)))
+           '(lambda (z)
+              (when (and (boolean? z)
+                         (not (k:strict-true? z)))
+                #t)))
+(test-comp '(lambda (z)
+              (when (and (boolean? z)
+                         (not (not z)))
+                (k:strict-true? z)))
+           '(lambda (z)
+              (when (and (boolean? z)
+                         (not (not z)))
+                #t)))
+
 
 (let ([test-reduce
        (lambda (pred-name expr [val #t])
@@ -4653,6 +4678,22 @@
               (define f 5)
               (error 'error)
               (set! f 0))
+           #f)
+
+;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Test that the `if` is not confused by the
+;; predicates that recognize #f.
+
+(test-comp '(lambda (x) (when (boolean? x)
+                          (if x 1 2)))
+           '(lambda (x) (when (boolean? x)
+                          1))
+           #f)
+
+(test-comp '(lambda (x) (when (not x)
+                          (if x 1 2)))
+           '(lambda (x) (when (not x)
+                          1))
            #f)
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

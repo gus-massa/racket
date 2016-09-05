@@ -5412,18 +5412,25 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
 
       pred = expr_implies_predicate(t2, info); 
       if (pred) {
-        Scheme_Object *test_val = SAME_OBJ(pred, scheme_not_proc) ? scheme_false : scheme_true;
+        Scheme_Object *test_val = NULL;
+        
+        if (predicate_implies(pred, scheme_not_proc))
+          test_val = scheme_false;
+        else if (predicate_implies_not(pred, scheme_not_proc))
+          test_val = scheme_true;
 
-        t2 = optimize_ignored(t2, info, 1, 0, 5);
-        t = replace_tail_inside(t2, inside, t);
+        if (test_val) {
+          t2 = optimize_ignored(t2, info, 1, 0, 5);
+          t = replace_tail_inside(t2, inside, t);
 
-        t2 = test_val;
-        if (scheme_omittable_expr(t, 1, 5, 0, info, NULL)) {
-          t = test_val;
-          inside = NULL;
-        } else {
-          t = make_sequence_2(t, test_val);
-          inside = t;
+          t2 = test_val;
+          if (scheme_omittable_expr(t, 1, 5, 0, info, NULL)) {
+            t = test_val;
+            inside = NULL;
+          } else {
+            t = make_sequence_2(t, test_val);
+            inside = t;
+          }
         }
       }
     }

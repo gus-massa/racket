@@ -2102,6 +2102,7 @@
   (test-pred-implies-val 'null? 'null)
   (test-pred-implies-val 'void? '(void))
   (test-pred-implies-val 'eof-object? 'eof)
+  (test-pred-implies-val 'k:strict-true? '#t)  
   (test-pred-implies-val 'not '#f))
 (test-comp '(lambda (x) (if (null? x) 1 0) null)
            '(lambda (x) (if (null? x) 1 0) x)

@@ -3610,9 +3610,9 @@ static Scheme_Object *finish_optimize_any_application(Scheme_Object *app, Scheme
   if ((context & OPT_CONTEXT_BOOLEAN) && !info->escapes) {
     Scheme_Object *pred;
     pred = rator_implies_predicate(rator, argc);
-    if (pred && predicate_implies_not(rator, scheme_not_proc))
+    if (pred && predicate_implies_not(pred, scheme_not_proc))
       return make_discarding_sequence(app, scheme_true, info);
-    else if (pred && predicate_implies(rator, scheme_not_proc))
+    else if (pred && predicate_implies(pred, scheme_not_proc))
       return make_discarding_sequence(app, scheme_false, info);
   }
 

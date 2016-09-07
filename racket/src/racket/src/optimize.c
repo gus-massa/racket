@@ -2944,6 +2944,42 @@ static Scheme_Object *rator_implies_predicate(Scheme_Object *rator, int argc)
       return scheme_void_p_proc;
     else if (SAME_OBJ(rator, scheme_procedure_specialize_proc))
       return scheme_procedure_p_proc;
+    else if (IS_NAMED_PRIM(rator, "pair?")
+             || IS_NAMED_PRIM(rator, "mpair?")
+             || IS_NAMED_PRIM(rator, "list?")
+             || IS_NAMED_PRIM(rator, "list-pair?")
+             || IS_NAMED_PRIM(rator, "vector?")
+             || IS_NAMED_PRIM(rator, "box?")
+             || IS_NAMED_PRIM(rator, "number?")
+             || IS_NAMED_PRIM(rator, "real?")
+             || IS_NAMED_PRIM(rator, "complex?")
+             || IS_NAMED_PRIM(rator, "rational?")
+             || IS_NAMED_PRIM(rator, "integer?")
+             || IS_NAMED_PRIM(rator, "exact-integer?")
+             || IS_NAMED_PRIM(rator, "exact-nonnegative-integer?")
+             || IS_NAMED_PRIM(rator, "exact-positive-integer?")
+             || IS_NAMED_PRIM(rator, "inexact-real?")
+             || IS_NAMED_PRIM(rator, "fixnum?")
+             || IS_NAMED_PRIM(rator, "flonum?")
+             || IS_NAMED_PRIM(rator, "single-flonum?")
+             || IS_NAMED_PRIM(rator, "null?")
+             || IS_NAMED_PRIM(rator, "void?")
+             || IS_NAMED_PRIM(rator, "symbol?")
+             || IS_NAMED_PRIM(rator, "keyword?")
+             || IS_NAMED_PRIM(rator, "string?")
+             || IS_NAMED_PRIM(rator, "bytes?")
+             || IS_NAMED_PRIM(rator, "path?")
+             || IS_NAMED_PRIM(rator, "char?")
+             || IS_NAMED_PRIM(rator, "boolean?")
+             || IS_NAMED_PRIM(rator, "chaperone?")
+             || IS_NAMED_PRIM(rator, "impersonator?")
+             || IS_NAMED_PRIM(rator, "procedure?")
+             || IS_NAMED_PRIM(rator, "eof-object?")
+             || IS_NAMED_PRIM(rator, "immutable?")
+             || IS_NAMED_PRIM(rator, "not")
+             || IS_NAMED_PRIM(rator, "strict-true?")) {
+      return scheme_boolean_p_proc;
+    }
 
     {
       Scheme_Object *p;

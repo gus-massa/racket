@@ -9191,6 +9191,9 @@ Scheme_Object *optimize_clone(int single_use, Scheme_Object *expr, Optimize_Info
 {
   int t;
 
+  if (single_use)
+    return expr;
+
   t = SCHEME_TYPE(expr);
 
   switch(t) {

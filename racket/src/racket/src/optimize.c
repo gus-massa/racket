@@ -2439,6 +2439,7 @@ Scheme_Object *optimize_for_inline(Optimize_Info *info, Scheme_Object *le, int a
           }
           if (iv && SCHEME_TRUEP(iv)) {
             le = iv;
+            already_opt = 1;
             break;
           }
         }

@@ -2390,6 +2390,13 @@ Scheme_Object *optimize_for_inline(Optimize_Info *info, Scheme_Object *le, int a
 
   le = extract_specialized_proc(le, le);
 
+  if (!already_opt && SCHEME_LAMBDAP(le)) {
+    /* We have an immediate `lambda' that wasn't optimized, yet.
+       Go optimize it, first. */
+    return NULL;
+  }
+  already_opt = 1;
+
   if (SAME_TYPE(SCHEME_TYPE(le), scheme_ir_lambda_type)) {
     /* Found a `((lambda' */
     single_use = 1;

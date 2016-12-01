@@ -2390,8 +2390,8 @@ Scheme_Object *optimize_for_inline(Optimize_Info *info, Scheme_Object *le, int a
 
   le = extract_specialized_proc(le, le);
 
-  if (SAME_TYPE(SCHEME_TYPE(le), scheme_ir_lambda_type)) {
-    /* Found a `((lambda' */
+  if (SCHEME_LAMBDAP(le)) {
+    /* Found a `((lambda' or `((case-lambda' */
     single_use = 1;
   }
 

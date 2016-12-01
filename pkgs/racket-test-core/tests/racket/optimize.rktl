@@ -1257,6 +1257,23 @@
                  g
                  g))))
 
+;; Check reduction of single-use lambdas
+;; this test uses that a lambda with a '(1) can't be duplicated
+(test-comp '((lambda (x) '(1)) 5)
+           ''(1))
+(test-comp '((case-lambda [(x) '(1)] [(x y) 0]) 5)
+           ''(1))
+(test-comp '(let ([f (lambda (x) '(1))])
+              (f 5))
+           ''(1))
+(test-comp '(let ([f (case-lambda [(x) '(1)] [(x y) 0])])
+              (f 5))
+           ''(1))
+(test #t (lambda () (let ([f (lambda (x) '(1))])
+                      (eq? (f 5) (f 5)))))
+(test #t (lambda () (let ([f (case-lambda [(x) '(1)] [(x y) 0])])
+                      (eq? (f 5) (f 5)))))
+
 (test-comp '(lambda (w z)
               (let ([x (cons w z)])
                 (car x)))

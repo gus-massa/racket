@@ -921,8 +921,10 @@ static Scheme_Object *optimize_ignored(Scheme_Object *e, Optimize_Info *info,
         int i;
 
         body = head->body;
-        if (0 == head->num_clauses)
+        if (0 == head->num_clauses) {
+          fprintf(stderr, "[000000000000000000000000000000!]");
           lv = (Scheme_IR_Let_Value *)body;
+        }
         for (i = head->num_clauses; i--; ) {
           lv = (Scheme_IR_Let_Value *)body;
           body = lv->body;

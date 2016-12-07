@@ -916,18 +916,18 @@ static Scheme_Object *optimize_ignored(Scheme_Object *e, Optimize_Info *info,
     case scheme_ir_let_header_type:
       {
         Scheme_IR_Let_Header *head = (Scheme_IR_Let_Header *)e;
-        Scheme_IR_Let_Value *lv;
+        Scheme_IR_Let_Value *lv = NULL;
         Scheme_Object *body;
         int i;
 
         body = head->body;
-        if (0 == head->num_clauses)
-          lv = (Scheme_IR_Let_Value *)body;
         for (i = head->num_clauses; i--; ) {
           lv = (Scheme_IR_Let_Value *)body;
           body = lv->body;
         }
         body = optimize_ignored(body, info, expected_vals, 0, fuel - 1);
+        if (!head->num_clauses)
+          return body;
         lv->body = body;
         return (Scheme_Object*)head;
       }

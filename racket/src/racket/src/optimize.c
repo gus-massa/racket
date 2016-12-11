@@ -768,16 +768,15 @@ static Scheme_Object *escaping_as_non_tail(Scheme_Object *expr)
    expressions would lift `expr` out of a nested position. That's ok
    unless `expr` has a `with-continuation-mark` form in tail position,
    in which case the shift out of a nested position is observable. 
-   Add a wrapping `(begin ... <void>)` if necessary to avoid that. */
+   Add a wrapping `(begin0 expr)` if necessary to avoid that. */
 {
   Scheme_Sequence *seq;
 
   if (!definitely_no_wcm_in_tail(expr, 5)) {
-    seq = scheme_malloc_sequence(2);
-    seq->so.type = scheme_sequence_type;
-    seq->count = 2;
+    seq = scheme_malloc_sequence(1);
+    seq->so.type = scheme_begin0_sequence_type;
+    seq->count = 1;
     seq->array[0] = expr;
-    seq->array[1] = scheme_void;
     
     return (Scheme_Object *)seq;
   } else

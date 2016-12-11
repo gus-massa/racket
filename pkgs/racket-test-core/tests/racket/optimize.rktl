@@ -3872,7 +3872,7 @@
 (let ([f (lambda ()
            (with-continuation-mark
                'contrast-dye 1
-               (begin
+               (begin0
                  (with-continuation-mark
                      'contrast-dye 2
                      (+ 1 #f))
@@ -3895,7 +3895,7 @@
                     `(lambda ()
                       (with-continuation-mark
                           'contrast-dye 1
-                          (begin
+                          (begin0
                             (with-continuation-mark
                                 'contrast-dye 2
                                 (+ 1 #f))
@@ -3903,10 +3903,14 @@
   (check-escape-position (lambda (e)
                            `(+ 1 ,e)))
   (check-escape-position (lambda (e)
+                           `(values ,e)))
+  (check-escape-position (lambda (e)
                            `(let ([x ,e])
                              x)))
   (check-escape-position (lambda (e)
                            `(if ,e 1 2)))
+  (check-escape-position (lambda (e)
+                           `(begin ,e 1)))
   (check-escape-position (lambda (e)
                            `(begin0 ,e 1))))
 

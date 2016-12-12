@@ -167,6 +167,7 @@ static Scheme_Object *optimize_clone(int single_use, Scheme_Object *obj, Optimiz
 XFORM_NONGCING static int relevant_predicate(Scheme_Object *pred);
 XFORM_NONGCING static int predicate_implies(Scheme_Object *pred1, Scheme_Object *pred2);
 XFORM_NONGCING static int predicate_implies_not(Scheme_Object *pred1, Scheme_Object *pred2);
+static int single_valued_expression(Scheme_Object *expr, int fuel);
 static int single_valued_noncm_expression(Scheme_Object *expr, int fuel);
 static Scheme_Object *optimize_ignored(Scheme_Object *e, Optimize_Info *info,
                                        int expected_vals, int maybe_omittable,
@@ -681,6 +682,22 @@ static Scheme_Object *ensure_single_value(Scheme_Object *e)
 /* Wrap `e` so that it either produces a single value or fails */
 {
   Scheme_App2_Rec *app2;
+  if (single_valued_expression(e, 5))
+    return e;
+
+  app2 = MALLOC_ONE_TAGGED(Scheme_App2_Rec);
+  app2->iso.so.type = scheme_application2_type;
+  app2->rator = scheme_values_proc;
+  app2->rand = e;
+  SCHEME_APPN_FLAGS(app2) |= (APPN_FLAG_IMMED | APPN_FLAG_SFS_TAIL);
+  
+  return (Scheme_Object *)app2;
+}
+
+static Scheme_Object *ensure_single_value_noncm(Scheme_Object *e)
+/* Wrap `e` so that it either produces a single value or fails */
+{
+  Scheme_App2_Rec *app2;
   if (single_valued_noncm_expression(e, 5))
     return e;
 
@@ -794,7 +811,7 @@ static Scheme_Object *do_make_discarding_sequence(Scheme_Object *e1, Scheme_Obje
   if (ignored)
     e2 = optimize_ignored(e2, info, 1, 0, 5);
     
-  e2 = ensure_single_value(e2);
+  e2 = ensure_single_value_noncm(e2);
   
   if (scheme_omittable_expr(e1, 1, 5, 0, info, NULL))
     return e2;
@@ -802,7 +819,7 @@ static Scheme_Object *do_make_discarding_sequence(Scheme_Object *e1, Scheme_Obje
   e1 = ensure_single_value(optimize_ignored(e1, info, 1, 0, 5));
 
   if (ignored && scheme_omittable_expr(e2, 1, 5, 0, info, NULL))
-    return e1;
+    return ensure_single_value_noncm(e1);
 
   /* use `begin` instead of `begin0` if we can swap the order: */
   if (rev && movable_expression(e2, info, 0, 1, 1, 0, 50))
@@ -862,6 +879,7 @@ static Scheme_Object *make_discarding_app_sequence(Scheme_App_Rec *appr, int res
     e = ensure_single_value(e);
     if (i == result_pos) {
       if (SCHEME_NULLP(l)) {
+        e = ensure_single_value_noncm(e);
         l = scheme_make_pair(e, scheme_null);
       } else {
         l = scheme_make_sequence_compilation(scheme_make_pair(e, l), -1, 0);
@@ -932,7 +950,7 @@ static Scheme_Object *optimize_ignored(Scheme_Object *e, Optimize_Info *info,
                 && (SCHEME_INT_VAL(app->rand1) >= 0))
                 && IN_FIXNUM_RANGE_ON_ALL_PLATFORMS(SCHEME_INT_VAL(app->rand1))) {
           Scheme_Object *val;
-          val = ensure_single_value(app->rand2);
+          val = ensure_single_value_noncm(app->rand2);
           return optimize_ignored(val, info, 1, maybe_omittable, 5);
         }
       }
@@ -959,7 +977,7 @@ static Scheme_Object *optimize_ignored(Scheme_Object *e, Optimize_Info *info,
           return (Scheme_Object*)b;
         } else {
           Scheme_Object *val;
-          val = ensure_single_value(b->test);
+          val = ensure_single_value_noncm(b->test);
           return optimize_ignored(val, info, 1, maybe_omittable, 5);
         }
       }
@@ -1875,9 +1893,8 @@ XFORM_NONGCING static int is_struct_identity_subtype(Scheme_Object *sub, Scheme_
   }
   return 0;
 }
-  
 
-static int single_valued_expression(Scheme_Object *expr, int fuel, int non_cm)
+static int do_single_valued_noncm_expression(Scheme_Object *expr, int fuel, int non_cm)
 /* Not necessarily omittable or copyable, but single-valued expressions.
    If `non_cm`, the expression must not be sensitive
    to being in tail position. */
@@ -1909,14 +1926,14 @@ static int single_valued_expression(Scheme_Object *expr, int fuel, int non_cm)
  case scheme_branch_type:
    if (fuel > 0) {
      Scheme_Branch_Rec *b = (Scheme_Branch_Rec *)expr;
-     return (single_valued_expression(b->tbranch, fuel - 1, non_cm)
-             && single_valued_expression(b->fbranch, fuel - 1, non_cm));
+     return (do_single_valued_noncm_expression(b->tbranch, fuel - 1, non_cm)
+             && do_single_valued_noncm_expression(b->fbranch, fuel - 1, non_cm));
    }
    break;
  case scheme_begin0_sequence_type:
    if (fuel > 0) {
       Scheme_Sequence *seq = (Scheme_Sequence *)expr;
-      return single_valued_expression(seq->array[0], fuel - 1, 0);
+      return do_single_valued_noncm_expression(seq->array[0], fuel - 1, 0);
    }
    break;
  case scheme_with_cont_mark_type:
@@ -1927,7 +1944,7 @@ static int single_valued_expression(Scheme_Object *expr, int fuel, int non_cm)
           the continuation at all. */
        return scheme_omittable_expr(wcm->body, 1, fuel, 0, NULL, NULL);
      } else
-       return single_valued_expression(wcm->body, fuel - 1, 0);
+       return do_single_valued_noncm_expression(wcm->body, fuel - 1, 0);
    }
    break;
  case scheme_ir_lambda_type:
@@ -1944,7 +1961,7 @@ static int single_valued_expression(Scheme_Object *expr, int fuel, int non_cm)
       Scheme_Object *tail = expr, *inside = NULL;
       extract_tail_inside(&tail, &inside);
       if (inside)
-        return single_valued_expression(tail, fuel - 1, non_cm);
+        return do_single_valued_noncm_expression(tail, fuel - 1, non_cm);
     }
 
    break;
@@ -1966,7 +1983,12 @@ static int single_valued_expression(Scheme_Object *expr, int fuel, int non_cm)
 
 static int single_valued_noncm_expression(Scheme_Object *expr, int fuel)
 {
-  return single_valued_expression(expr, fuel, 1);
+  return do_single_valued_noncm_expression(expr, fuel, 1);
+}
+
+static int single_valued_expression(Scheme_Object *expr, int fuel)
+{
+  return do_single_valued_noncm_expression(expr, fuel, 0);
 }
 
 static int is_movable_prim(Scheme_Object *rator, int n, int cross_lambda, int cross_k, Optimize_Info *info)
@@ -4272,7 +4294,7 @@ static Scheme_Object *finish_optimize_application2(Scheme_App2_Rec *app, Optimiz
             || IS_NAMED_PRIM(rator, "unsafe-car")) {
           if (SAME_OBJ(scheme_list_proc, app2->rator)) {
             /* (car (list X)) */
-            alt = ensure_single_value(app2->rand);
+            alt = ensure_single_value_noncm(app2->rand);
             return replace_tail_inside(alt, inside, app->rand);
           }
         } else if (IS_NAMED_PRIM(rator, "cdr")
@@ -4287,7 +4309,7 @@ static Scheme_Object *finish_optimize_application2(Scheme_App2_Rec *app, Optimiz
                    || IS_NAMED_PRIM(rator, "unsafe-unbox*")) {
           if (SAME_OBJ(scheme_box_proc, app2->rator)) {
             /* (unbox (box X)) */
-            alt = ensure_single_value(app2->rand);
+            alt = ensure_single_value_noncm(app2->rand);
             return replace_tail_inside(alt, inside, app->rand);
           }
         }
@@ -4803,12 +4825,12 @@ static Scheme_Object *finish_optimize_application3(Scheme_App3_Rec *app, Optimiz
     z2 = SAME_OBJ(app->rand2, scheme_make_integer(0));
     if (IS_NAMED_PRIM(app->rator, "unsafe-fx+")) {
       if (z1)
-        return ensure_single_value(app->rand2);
+        return ensure_single_value_noncm(app->rand2);
       else if (z2)
-        return ensure_single_value(app->rand1);
+        return ensure_single_value_noncm(app->rand1);
     } else if (IS_NAMED_PRIM(app->rator, "unsafe-fx-")) {
       if (z2)
-        return ensure_single_value(app->rand1);
+        return ensure_single_value_noncm(app->rand1);
     } else if (IS_NAMED_PRIM(app->rator, "unsafe-fx*")) {
       if (z1 || z2) {
         if (z1 && z2)
@@ -4819,14 +4841,14 @@ static Scheme_Object *finish_optimize_application3(Scheme_App3_Rec *app, Optimiz
           return make_discarding_sequence(app->rand2, scheme_make_integer(0), info);
       }
       if (SAME_OBJ(app->rand1, scheme_make_integer(1)))
-        return ensure_single_value(app->rand2);
+        return ensure_single_value_noncm(app->rand2);
       if (SAME_OBJ(app->rand2, scheme_make_integer(1)))
-        return ensure_single_value(app->rand1);
+        return ensure_single_value_noncm(app->rand1);
     } else if (IS_NAMED_PRIM(app->rator, "unsafe-fxquotient")) {
       if (z1)
         return make_discarding_sequence(app->rand2, scheme_make_integer(0), info);
       if (SAME_OBJ(app->rand2, scheme_make_integer(1)))
-        return ensure_single_value(app->rand1);
+        return ensure_single_value_noncm(app->rand1);
     } else if (IS_NAMED_PRIM(app->rator, "unsafe-fxremainder")
                || IS_NAMED_PRIM(app->rator, "unsafe-fxmodulo")) {
       if (z1)
@@ -4840,20 +4862,20 @@ static Scheme_Object *finish_optimize_application3(Scheme_App3_Rec *app, Optimiz
 
     if (IS_NAMED_PRIM(app->rator, "unsafe-fl+")) {
       if (z1)
-        return ensure_single_value(app->rand2);
+        return ensure_single_value_noncm(app->rand2);
       else if (z2)
-        return ensure_single_value(app->rand1);
+        return ensure_single_value_noncm(app->rand1);
     } else if (IS_NAMED_PRIM(app->rator, "unsafe-fl-")) {
       if (z2)
-        return ensure_single_value(app->rand1);
+        return ensure_single_value_noncm(app->rand1);
     } else if (IS_NAMED_PRIM(app->rator, "unsafe-fl*")) {
       if (SCHEME_FLOATP(app->rand1) && (SCHEME_FLOAT_VAL(app->rand1) == 1.0))
-        return ensure_single_value(app->rand2);
+        return ensure_single_value_noncm(app->rand2);
       if (SCHEME_FLOATP(app->rand2) && (SCHEME_FLOAT_VAL(app->rand2) == 1.0))
-        return ensure_single_value(app->rand1);
+        return ensure_single_value_noncm(app->rand1);
     } else if (IS_NAMED_PRIM(app->rator, "unsafe-fl/")) {
       if (SCHEME_FLOATP(app->rand2) && (SCHEME_FLOAT_VAL(app->rand2) == 1.0))
-        return ensure_single_value(app->rand1);
+        return ensure_single_value_noncm(app->rand1);
     }
 
     /* Possible improvement: detect 0 and 1 constants even when general
@@ -4864,20 +4886,20 @@ static Scheme_Object *finish_optimize_application3(Scheme_App3_Rec *app, Optimiz
 
     if (IS_NAMED_PRIM(app->rator, "unsafe-extfl+")) {
       if (z1)
-        return ensure_single_value(app->rand2);
+        return ensure_single_value_noncm(app->rand2);
       else if (z2)
-        return ensure_single_value(app->rand1);
+        return ensure_single_value_noncm(app->rand1);
     } else if (IS_NAMED_PRIM(app->rator, "unsafe-extfl-")) {
       if (z2)
-        return ensure_single_value(app->rand1);
+        return ensure_single_value_noncm(app->rand1);
     } else if (IS_NAMED_PRIM(app->rator, "unsafe-extfl*")) {
       if (SCHEME_LONG_DBLP(app->rand1) && long_double_is_1(SCHEME_LONG_DBL_VAL(app->rand1)))
-        return ensure_single_value(app->rand2);
+        return ensure_single_value_noncm(app->rand2);
       if (SCHEME_LONG_DBLP(app->rand2) && long_double_is_1(SCHEME_LONG_DBL_VAL(app->rand2)))
-        return ensure_single_value(app->rand1);
+        return ensure_single_value_noncm(app->rand1);
     } else if (IS_NAMED_PRIM(app->rator, "unsafe-extfl/")) {
       if (SCHEME_LONG_DBLP(app->rand2) && long_double_is_1(SCHEME_LONG_DBL_VAL(app->rand2)))
-        return ensure_single_value(app->rand1);
+        return ensure_single_value_noncm(app->rand1);
     }
 #endif
   } else if (SCHEME_PRIMP(app->rator)
@@ -5866,7 +5888,7 @@ static Scheme_Object *optimize_branch(Scheme_Object *o, Optimize_Info *info, int
 
     if (pred && predicate_implies(pred, scheme_boolean_p_proc)) {
       info->size -= 2;
-      return ensure_single_value(t);
+      return ensure_single_value_noncm(t);
     }
   }
 
@@ -7297,7 +7319,7 @@ static Scheme_Object *optimize_lets(Scheme_Object *form, Optimize_Info *info, in
     irlv = (Scheme_IR_Let_Value *)head->body;
     if (SAME_OBJ((Scheme_Object *)irlv->vars[0], irlv->body)) {
       body = irlv->value;
-      body = ensure_single_value(body);
+      body = ensure_single_value_noncm(body);
       return scheme_optimize_expr(body, info, context);
     }
   }
@@ -8030,7 +8052,7 @@ static Scheme_Object *optimize_lets(Scheme_Object *form, Optimize_Info *info, in
       } else {
         /* Special case for (let ([x E]) x) and (let ([x <error>]) #f) */
         body = pre_body->value;
-        body = ensure_single_value(body);
+        body = ensure_single_value_noncm(body);
         if (found_escapes) {
           found_escapes = 0; /* Perhaps the error is moved to the body. */
           body = escaping_as_non_tail(body);
@@ -8065,7 +8087,7 @@ static Scheme_Object *optimize_lets(Scheme_Object *form, Optimize_Info *info, in
         seq->count = 2;
 
         rhs = pre_body->value;
-        rhs = ensure_single_value(rhs);
+        rhs = ensure_single_value_noncm(rhs);
         seq->array[0] = rhs;
 
         head->count--;

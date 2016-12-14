@@ -1849,7 +1849,6 @@ static int single_valued_noncm_function(Scheme_Object *rator, int num_args,
   return 0;
 }
 
-
 static int do_single_valued_noncm_expression(Scheme_Object *expr, int fuel, int s_v, int non_cm)
 /* Not necessarily omittable or copyable expression.
    If `s_v`, the expression must not be single-valued.
@@ -1857,95 +1856,92 @@ static int do_single_valued_noncm_expression(Scheme_Object *expr, int fuel, int 
    it has no with-continuation-mark in tail position, unless the body is omittable.
    The conservative answer is 0. */
 {
-  Scheme_Object *rator = NULL;
-  int num_args = 0;
-  
   if (!s_v && !non_cm)
     return 1;
-    
-  if (!fuel)
-    return 0;
-   
- switch (SCHEME_TYPE(expr)) {
- case scheme_ir_local_type:
-   return 1;
- case scheme_local_type:
-   return 1;
- case scheme_local_unbox_type:
-   return 1;
- case scheme_ir_toplevel_type:
-   return 1;
- case scheme_application_type:
-   {
-     Scheme_App_Rec *app = (Scheme_App_Rec *)expr;
-     return single_valued_noncm_function(app->args[0], app->num_args, s_v, non_cm);
-   }
-   break;
- case scheme_application2_type:
-   {
-     Scheme_App2_Rec *app = (Scheme_App2_Rec *)expr;
-     return single_valued_noncm_function(app->rator, 1, s_v, non_cm);
-   }
-   break;
- case scheme_application3_type:
-   {
-     Scheme_App3_Rec *app = (Scheme_App3_Rec *)expr;
-     return single_valued_noncm_function(app->rator, 2, s_v, non_cm);
-   }
-   break;
- case scheme_branch_type:
-   {
-     Scheme_Branch_Rec *b = (Scheme_Branch_Rec *)expr;
-     return (do_single_valued_noncm_expression(b->tbranch, fuel - 1, s_v, non_cm)
-             && do_single_valued_noncm_expression(b->fbranch, fuel - 1, s_v, non_cm));
-   }
-   break;
- case scheme_ir_let_header_type:
-   {
-     Scheme_IR_Let_Header *hl = (Scheme_IR_Let_Header *)expr;
-     return do_single_valued_noncm_expression(hl->body, fuel - 1, s_v, non_cm);
-   }
-   break;
- case scheme_ir_let_value_type:
-   {
-     Scheme_IR_Let_Value *lv = (Scheme_IR_Let_Value *)expr;
-     return do_single_valued_noncm_expression(lv->body, fuel - 1, s_v, non_cm);
-   }
-   break;
- case scheme_sequence_type:
-   {
-     Scheme_Sequence *seq = (Scheme_Sequence *)expr;
-     return do_single_valued_noncm_expression(seq->array[seq->count-1], fuel - 1, s_v, non_cm);
-   }
-   break;
- case scheme_begin0_sequence_type:
-   {
-      Scheme_Sequence *seq = (Scheme_Sequence *)expr;
-      return do_single_valued_noncm_expression(seq->array[0], fuel - 1, s_v, 0);
-   }
-   break;
- case scheme_with_cont_mark_type:
-   {
-     Scheme_With_Continuation_Mark * wcm = (Scheme_With_Continuation_Mark *)expr;
-     if (non_cm) {
-       /* To avoid being sensitive to tail position, the body must not inspect
-          the continuation at all. */
-       return scheme_omittable_expr(wcm->body, 1, fuel, 0, NULL, NULL);
-     } else
-       return do_single_valued_noncm_expression(wcm->body, fuel - 1, s_v, 0);
-   }
-   break;
- case scheme_ir_lambda_type:
- case scheme_case_lambda_sequence_type:
- case scheme_set_bang_type:
-   return 1;
- default:
-   if (SCHEME_TYPE(expr) > _scheme_ir_values_types_)
-     return 1;
-   break;
- }
 
- return 0;
+  while (fuel) {
+    switch (SCHEME_TYPE(expr)) {
+    case scheme_ir_local_type:
+    case scheme_local_type:
+    case scheme_local_unbox_type:
+    case scheme_ir_toplevel_type:
+      return 1;
+      break;
+    case scheme_application_type:
+      {
+        Scheme_App_Rec *app = (Scheme_App_Rec *)expr;
+        return single_valued_noncm_function(app->args[0], app->num_args, s_v, non_cm);
+      }
+      break;
+    case scheme_application2_type:
+      {
+        Scheme_App2_Rec *app = (Scheme_App2_Rec *)expr;
+        return single_valued_noncm_function(app->rator, 1, s_v, non_cm);
+      }
+      break;
+    case scheme_application3_type:
+      {
+        Scheme_App3_Rec *app = (Scheme_App3_Rec *)expr;
+        return single_valued_noncm_function(app->rator, 2, s_v, non_cm);
+      }
+      break;
+    case scheme_branch_type:
+      {
+        Scheme_Branch_Rec *b = (Scheme_Branch_Rec *)expr;
+        return (do_single_valued_noncm_expression(b->tbranch, fuel - 1, s_v, non_cm)
+                && do_single_valued_noncm_expression(b->fbranch, fuel - 1, s_v, non_cm));
+      }
+      break;
+    case scheme_ir_let_header_type:
+      {
+        Scheme_IR_Let_Header *hl = (Scheme_IR_Let_Header *)expr;
+        expr = hl->body;
+      }
+      break;
+    case scheme_ir_let_value_type:
+      {
+        Scheme_IR_Let_Value *lv = (Scheme_IR_Let_Value *)expr;
+        expr = lv->body;
+      }
+      break;
+    case scheme_sequence_type:
+      {
+        Scheme_Sequence *seq = (Scheme_Sequence *)expr;
+        expr = seq->array[seq->count-1];
+      }
+      break;
+    case scheme_begin0_sequence_type:
+      {
+         Scheme_Sequence *seq = (Scheme_Sequence *)expr;
+      expr = seq->array[0];
+      }
+      break;
+    case scheme_with_cont_mark_type:
+      {
+        Scheme_With_Continuation_Mark * wcm = (Scheme_With_Continuation_Mark *)expr;
+        if (non_cm) {
+          /* To avoid being sensitive to tail position, the body must not inspect
+             the continuation at all. */
+          return scheme_omittable_expr(wcm->body, 1, fuel, 0, NULL, NULL);
+        } else {
+          expr = wcm->body;
+        }
+      }
+      break;
+    case scheme_ir_lambda_type:
+    case scheme_case_lambda_sequence_type:
+    case scheme_set_bang_type:
+      return 1;
+      break;
+    default:
+      if (SCHEME_TYPE(expr) > _scheme_ir_values_types_)
+        return 1;
+      break;
+    }
+    fuel--;
+  }
+
+  return 0;
 }
 
 static int single_valued_noncm_expression(Scheme_Object *expr, int fuel)

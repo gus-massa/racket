@@ -2266,7 +2266,10 @@
                     `(lambda (z) ',pred-name))
          (test-comp `(lambda (z)
                        (boolean? (,pred-name z)))
-                    `(lambda (z) (,pred-name z) #t)))])
+                    `(lambda (z) (,pred-name z) #t))
+         (test-comp `(lambda (z)
+                       (values (,pred-name z)))
+                    `(lambda (z) (,pred-name z))))])
   (test-pred 'pair?)
   (test-pred 'mpair?)
   (test-pred 'list?)
@@ -3426,6 +3429,25 @@
               (begin0
                (a? (a-x (a 1 2)))
                5)))
+
+(test-comp '(module m racket/base
+              (struct a (x y) #:omit-define-syntaxes)
+              (display
+               (list
+                #;(lambda (f) (values (f)))
+                (lambda (x) (values (a? x)))
+                #;(lambda (x) (values (a 1 2)))
+                #;(lambda (x) (values (a-x x))
+                #;(lambda (x) (values (a-y x)))))))
+           '(module m racket/base
+              (struct a (x y) #:omit-define-syntaxes)
+              (display
+               (list
+                #;(lambda (f) (f))
+                (lambda (x) (a? x))
+                #;(lambda (x) (a 1 2))
+                #;(lambda (x) (a-x x)
+                #;(lambda (x) (a-y x)))))))
 
 (test-comp '(lambda ()
              (make-struct-type 'a #f 0 0 #f)

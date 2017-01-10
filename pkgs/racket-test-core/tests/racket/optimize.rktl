@@ -3437,7 +3437,7 @@
            '(module m racket/base
               #;(struct a () #:omit-define-syntaxes)
               1))
-; --- BAD: Strange errot --- 
+; --- BAD: Strange error --- 
 (test-comp '(module m racket/base
               (struct a () #:omit-define-syntaxes)
               0)

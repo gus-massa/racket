@@ -3427,6 +3427,27 @@
                (a? (a-x (a 1 2)))
                5)))
 
+
+
+
+; --- OK: Normal error ---
+(test-comp '(module m racket/base
+              #;(struct a () #:omit-define-syntaxes)
+              0)
+           '(module m racket/base
+              #;(struct a () #:omit-define-syntaxes)
+              1))
+; --- BAD: Strange errot --- 
+(test-comp '(module m racket/base
+              (struct a () #:omit-define-syntaxes)
+              0)
+           '(module m racket/base
+              (struct a () #:omit-define-syntaxes)
+              1))
+
+
+
+
 (test-comp '(lambda ()
              (make-struct-type 'a #f 0 0 #f)
              10)

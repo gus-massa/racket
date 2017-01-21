@@ -7406,8 +7406,9 @@ static Scheme_Object *optimize_lets(Scheme_Object *form, Optimize_Info *info, in
                                          ? (pre_body->vars[0]->use_count << OPT_CONTEXT_APP_COUNT_SHIFT)
                                          : 0)));
         pre_body->value = value;
+        rhs_info->escapes = 0; /* FIXME */
         if (rhs_info->escapes)
-          found_escapes = 1;
+           found_escapes = 1;
       } else {
         optimize_info_seq_step(rhs_info, &info_seq);
         value = scheme_false;

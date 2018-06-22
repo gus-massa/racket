@@ -34,7 +34,7 @@
   (log-expand* ctx #:when #t [key arg ...]))
 
 (define (call-expand-observe obs key . args)
-  (cond
+  #;(cond
    [(hash-ref key->arity key #f)
     => (lambda (arity)
          (unless (or (eq? arity 'any) (eqv? (length args) arity))

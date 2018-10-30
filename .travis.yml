@@ -5,7 +5,7 @@ env:
 - TARGET="cs"
 
 matrix:
-  allow-failures:
+  allow_failures:
     - env: TARGET="cs"
 
 script:

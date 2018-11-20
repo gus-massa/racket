@@ -2,15 +2,19 @@ sudo: false
 language: c
 env:
 - #
-- TARGET="cs"
+- TARGET="cs" RACKETCS_SUFFIX=""
 
 matrix:
   allow_failures:
-    - env: TARGET="cs"
+    - env: TARGET="cs" RACKETCS_SUFFIX=""
 
 script:
 - export PATH=./racket/bin:$PATH
-- make $TARGET CPUS="2" PKGS="base racket-test-core compiler-lib" CONFIGURE_ARGS_qq="$RACKET_CONFIGURE_ARGS"
-- which racket$TARGET
-- racket$TARGET -v
-- racket$TARGET -f pkgs/racket-test-core/tests/racket/quiet.rktl basic.rktl
+- make $TARGET                                     \
+       CPUS="2"                                    \
+       PKGS="base racket-test-core compiler-lib"   \
+       CONFIGURE_ARGS_qq="$RACKET_CONFIGURE_ARGS"  \
+       RACKETCS_SUFFIX="$RACKETCS_SUFFIX"
+- which racket
+- racket -v
+- racket -f pkgs/racket-test-core/tests/racket/quiet.rktl basic.rktl

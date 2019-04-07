@@ -974,9 +974,9 @@
           (putprop (record-type-uid rtd) 'guards new-guards))))))
 
 (define (unsafe-struct*-ref s i)
-  (#3%vector-ref s i))
+  (#3%$object-ref 'scheme-object s (+ 9 (* 16 i))))
 (define (unsafe-struct*-set! s i v)
-  (#3%vector-set! s i v))
+  (#3%$object-set! 'scheme-object s (+ 9 (* 16 i)) v))
 (define (unsafe-struct? v r)
   (#3%record? v r))
 

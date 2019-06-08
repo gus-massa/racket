@@ -371,7 +371,7 @@ If @racket[m] is exact @racket[0], the
 
 @defproc[(sub1 [z number?]) number?]{ Returns @racket[(- z 1)].}
 
-@defproc[(abs [x real?]) number?]{ Returns the absolute value of
+@defproc[(abs [x real?]) real?]{ Returns the absolute value of
  @racket[x].
 
 @mz-examples[(abs 1.0) (abs -1)]}

@@ -214,10 +214,13 @@ static Scheme_Once_Used *make_once_used(Scheme_Object *val, Scheme_IR_Local *var
                                         int vclock, int aclock, int kclock, int sclock, int spans_k);
 
 static ROSYM Scheme_Hash_Tree *empty_eq_hash_tree;
+static int is_safe_hash_constructor(Scheme_Object *rator, int n);
  
 #ifdef MZ_PRECISE_GC
 static void register_traversers(void);
 #endif
+
+#define IS_NAMED_PRIM(p, nm) (!strcmp(((Scheme_Primitive_Proc *)p)->name, nm))
 
 void scheme_init_optimize()
 {
@@ -356,8 +359,10 @@ int scheme_is_functional_nonfailing_primitive(Scheme_Object *rator, int num_args
    can be discarded if its results are ignored.
    Return 2 => true, and results are a constant when arguments are constants. */
 {
-  if (SCHEME_PRIMP(rator)
-      && (SCHEME_PRIM_PROC_OPT_FLAGS(rator) & (SCHEME_PRIM_IS_OMITABLE_ANY | SCHEME_PRIM_IS_UNSAFE_NONMUTATING))
+  if (!SCHEME_PRIMP(rator))
+    return 0;
+  
+  if ((SCHEME_PRIM_PROC_OPT_FLAGS(rator) & (SCHEME_PRIM_IS_OMITABLE_ANY | SCHEME_PRIM_IS_UNSAFE_NONMUTATING))
       && (num_args >= ((Scheme_Primitive_Proc *)rator)->mina)
       && (num_args <= ((Scheme_Primitive_Proc *)rator)->mu.maxa)
       && ((expected_vals < 0)
@@ -366,6 +371,9 @@ int scheme_is_functional_nonfailing_primitive(Scheme_Object *rator, int num_args
               && (expected_vals == num_args)))) {
     if (SAME_OBJ(scheme_values_proc, rator))
       return 2;
+    return 1;
+  } else if (((expected_vals < 0) || (expected_vals == 1))
+             && is_safe_hash_constructor(rator, num_args)){
     return 1;
   } else
     return 0;
@@ -872,6 +880,8 @@ static Scheme_Object *optimize_ignored(Scheme_Object *e, Optimize_Info *info,
     case scheme_application2_type:
       {
         Scheme_App2_Rec *app = (Scheme_App2_Rec *)e;
+        Scheme_Object *rator = app->rator;
+        Scheme_Object *rand = app->rand;
 
         if (!SAME_OBJ(app->rator, scheme_values_proc)) /* `values` is probably here to ensure a single result */
           if (scheme_is_functional_nonfailing_primitive(app->rator, 1, expected_vals))
@@ -882,6 +892,19 @@ static Scheme_Object *optimize_ignored(Scheme_Object *e, Optimize_Info *info,
             && (SCHEME_INTP(app->rand) 
                 && (SCHEME_INT_VAL(app->rand) >= 0))
                 && IN_FIXNUM_RANGE_ON_ALL_PLATFORMS(SCHEME_INT_VAL(app->rand)))
+          return (maybe_omittable ? NULL : scheme_void);
+
+        /* (make-hash null) => <void> */
+        if (SCHEME_NULLP(app->rand) 
+            && (IS_NAMED_PRIM(rator, "make-hash")
+                || IS_NAMED_PRIM(rator, "make-immutable-hash")
+                || IS_NAMED_PRIM(rator, "make-weak-hash")
+                || IS_NAMED_PRIM(rator, "make-hasheqv")
+                || IS_NAMED_PRIM(rator, "make-immutable-hasheqv")
+                || IS_NAMED_PRIM(rator, "make-weak-hasheqv")
+                || IS_NAMED_PRIM(rator, "make-hasheq")
+                // || IS_NAMED_PRIM(rator, "make-immutable-hasheq")
+                || IS_NAMED_PRIM(rator, "make-weak-hasheq")))
           return (maybe_omittable ? NULL : scheme_void);
       }
       break;
@@ -3127,6 +3150,32 @@ static Scheme_Object *check_app_let_rator(Scheme_Object *app, Scheme_Object *rat
   return optimize_expr(orig_rator, info, context);
 }
 
+static int is_safe_hash_constructor(Scheme_Object *rator, int n)
+{
+  if (!n
+      && SCHEME_PRIMP(rator)
+      && (IS_NAMED_PRIM(rator, "make-hash")
+          || IS_NAMED_PRIM(rator, "make-immutable-hash")
+          || IS_NAMED_PRIM(rator, "make-weak-hash")
+          || IS_NAMED_PRIM(rator, "make-hasheq")
+          // || IS_NAMED_PRIM(rator, "make-immutable-hasheq")
+          || IS_NAMED_PRIM(rator, "make-weak-hasheq")
+          || IS_NAMED_PRIM(rator, "make-hasheqv")
+          || IS_NAMED_PRIM(rator, "make-immutable-hasheqv")
+          || IS_NAMED_PRIM(rator, "make-weak-hasheqv")
+          || SAME_OBJ(rator, scheme_hash_proc)
+          || SAME_OBJ(rator, scheme_hasheq_proc)
+          || SAME_OBJ(rator, scheme_hasheqv_proc)))
+    return 1;
+
+  if (!(n & 0x1)
+      && (SAME_OBJ(rator, scheme_hasheq_proc)
+          || SAME_OBJ(rator, scheme_hasheqv_proc)))
+    return 1;
+
+  return 0;
+}
+
 static int is_nonmutating_nondependant_primitive(Scheme_Object *rator, int n)
 /* Does not include SCHEME_PRIM_IS_UNSAFE_OMITABLE, because those can
    depend on earlier tests (explicit or implicit) for whether the
@@ -3140,7 +3189,7 @@ static int is_nonmutating_nondependant_primitive(Scheme_Object *rator, int n)
       && (n <= ((Scheme_Primitive_Proc *)rator)->mu.maxa))
     return 1;
 
-  return 0;
+  return is_safe_hash_constructor(rator, n);
 }
 
 static int is_primitive_allocating(Scheme_Object *rator, int n)
@@ -3148,7 +3197,7 @@ static int is_primitive_allocating(Scheme_Object *rator, int n)
   if (SCHEME_PRIM_PROC_OPT_FLAGS(rator) & (SCHEME_PRIM_IS_OMITABLE_ALLOCATION))
     return 1;
 
-  return 0;
+  return is_safe_hash_constructor(rator, n);
 }
 
 static int is_noncapturing_primitive(Scheme_Object *rator, int n)
@@ -3196,8 +3245,6 @@ static int is_always_escaping_primitive(Scheme_Object *rator)
   }
   return 0;
 }
-
-#define IS_NAMED_PRIM(p, nm) (!strcmp(((Scheme_Primitive_Proc *)p)->name, nm))
 
 static int wants_local_type_arguments(Scheme_Object *rator, int argpos)
 {

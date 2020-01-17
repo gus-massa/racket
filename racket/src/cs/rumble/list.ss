@@ -9,6 +9,12 @@
 (define-thread-local lists (make-weak-eq-hashtable))
 
 (define (list? v)
+  (cond
+   [(null? v) #t]
+   [(not (pair? v)) #f]
+   [else (slow-list? v)]))
+
+(define (slow-list? v)
   (let loop ([v v] [depth 0])
     (cond
      [(null? v) #t]

@@ -18,7 +18,12 @@
 (define CHECK-EVERY 4)
 
 (define (list? v)
-  (let loop ([v v] [count 0])
+  (or (null? v)
+      (and (pair? v)
+           (#%$app/no-inline slow-list? v))))
+
+(define (slow-list? v)
+  (let loop ([v v] [depth 0])
     (cond
      [(null? v) #t]
      [(not (pair? v)) #f]

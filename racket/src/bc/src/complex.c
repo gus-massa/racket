@@ -242,7 +242,7 @@ Scheme_Object *scheme_complex_divide(const Scheme_Object *_n, const Scheme_Objec
   aa[0] = d;
   dm = scheme_abs(1, aa);
 
-  if (scheme_bin_lt(cm, dm)) {
+  if (scheme_bin_gt(cm, dm)) {
     cm = a;
     a = b;
     b = cm;

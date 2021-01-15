@@ -686,8 +686,8 @@ Notes:
   ; (implies-not? bottom y): never
   ; check (implies? x bottom) before (implies? x something)
   (define (predicate-implies? x y)
+   (or (not y)
     (and x
-         y
          (or (eq? x y)
              (eq? x 'bottom)
              (cond
@@ -762,12 +762,13 @@ Notes:
                   [(flvector) (check-constant-is? x flvector?)] ; i.e. '#vfl()
                   [(ptr) #t]
                   [else #f])]
-               [else #f]))))
+               [else #f])))))
 
   (define (predicate-implies-not? x y)
-    (and x
-         y
-         ; a pred-$record/ref may be any other kind or record
+   (or
+    (eq? x 'bottom)
+    (eq? y 'bottom)
+    (and ; a pred-$record/ref may be any other kind or record
          (not (and (pred-$record/ref? x)
                    (predicate-implies? y '$record)))
          (not (and (pred-$record/ref? y)
@@ -779,7 +780,7 @@ Notes:
                    (eq? x 'true)))
          ; the other types are included or disjoint
          (not (predicate-implies? x y))
-         (not (predicate-implies? y x))))
+         (not (predicate-implies? y x)))))
 
   (define (primref->result-predicate pr arity)
     (define parameterlike? box?)

@@ -188,11 +188,7 @@ allx: prettyclean saveboot
           if $(MAKE) checkboot > /dev/null 2>&1; then echo fine ; else\
             $(MAKE) prettyclean saveboot &&\
             $(MAKE) all &&\
-            if $(MAKE) checkboot > /dev/null 2>&1; then echo fine ; else\
-              $(MAKE) prettyclean saveboot &&\
-              $(MAKE) all &&\
-              $(MAKE) checkboot ;\
-            fi\
+            $(MAKE) checkboot ;\
           fi\
         fi
 	$(MAKE) restoreboot

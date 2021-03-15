@@ -39,7 +39,7 @@ jobs:
         run: |
           sudo dpkg --add-architecture i386
           sudo apt-get update
-          sudo apt-get install -y gcc-multilib lib32ncurses5-dev libx32ncurses5-dev libssl-dev:i386
+          sudo apt-get install -y gcc-multilib lib32ncurses5-dev libx32ncurses5-dev libssl1.1:i386 libssl-dev:i386
       - name: Install libs for 64-bit
         run: |
           sudo apt-get update

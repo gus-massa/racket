@@ -230,14 +230,16 @@
 
 (define (test-comp expr1 expr2 [same? #t]
                    #:except [except '()])
-  (unless (or (eq? (system-type 'vm) except)
-              (and (list? except)
-                   (memq (system-type 'vm) except)))
+  (define execepted (or (eq? (system-type 'vm) except)
+                        (and (list? except)
+                             (memq (system-type 'vm) except))))
+    ; complain if a test that is supoused to fail is not failing
+    (define same?/e (if execepted (not same?) same?)) 
     (define (->stx s)
       ;; Give `s` a minimal location, so that other macro locations
       ;; don't bleed through:
       (datum->syntax #f s (vector 'here #f #f #f #f)))
-    (test same? `(compile ,same? (,expr1 => ,expr2)) (comp=? (->stx expr1) (->stx expr2) same?))))
+    (test same?/e `(compile ,same? (,expr1 => ,expr2)) (comp=? (->stx expr1) (->stx expr2) same?)))
 
 (let ([x (compile '(lambda (x) x))])
   (test #t 'fixpt (eq? x (compile x))))

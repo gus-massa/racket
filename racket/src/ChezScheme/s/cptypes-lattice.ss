@@ -33,6 +33,9 @@
    eof/char-pred
    maybe-char-pred
    maybe-symbol-pred
+   fixnum-pred
+   bignum-pred
+   exact-integer-pred
    $fixmediate-pred
    $list-pred ; immutable lists
    true-pred ; anything that is not #f
@@ -65,6 +68,12 @@
     (nongenerative #{pred-$record/ref zc0e8e4cs8scbwhdj7qpad6k3-1})
     (sealed #t))
 
+  ; both extremes are included
+  (define-record-type exint-range
+    (fields b t nofixnum?)
+    (nongenerative #{exint-range dzxvsre69laqf6pg8j8te9xqa-0})
+    (sealed #t))
+
   (include "base-lang.ss")
   (with-output-language (Lsrc Expr)
     (define void-rec `(quote ,(void)))
@@ -78,10 +87,13 @@
   (define ptr-pred (make-pred-or 'immediate 'normalptr '$record))
   (define null-or-pair-pred (make-pred-or null-rec 'pair 'bottom))
   (define $list-pred (make-pred-or null-rec '$list-pair 'bottom))
-  (define $fixmediate-pred (make-pred-or 'immediate 'fixnum 'bottom))
-  (define maybe-fixnum-pred (make-pred-or false-rec 'fixnum 'bottom))
-  (define eof/fixnum-pred (make-pred-or eof-rec 'fixnum 'bottom))
-  (define maybe-exact-integer-pred (make-pred-or false-rec 'fixnum 'bottom))
+  (define fixnum-pred (build-exint-range (most-negative-fixnum) (most-positive-fixnum)))
+  (define $fixmediate-pred (make-pred-or 'immediate fixnum-pred 'bottom))
+  (define maybe-fixnum-pred (make-pred-or false-rec fixnum-pred 'bottom))
+  (define eof/fixnum-pred (make-pred-or eof-rec fixnum-pred 'bottom))
+  (define bignum-pred (build-exint-range #f #f #t))
+  (define exact-integer-pred (build-exint-range #f #f))
+  (define maybe-exact-integer-pred (make-pred-or false-rec exact-integer-pred 'bottom))
   (define maybe-flonum-pred (make-pred-or false-rec 'flonum 'bottom))
   (define maybe-number-pred (make-pred-or false-rec 'number 'bottom))
   (define maybe-symbol-pred (make-pred-or false-rec 'symbol 'bottom))
@@ -168,6 +180,30 @@
                           [else
                            (loop lo i)]))]))]))]))
 
+  (define build-exint-range
+    (case-lambda
+      [(b t)
+       (build-exint-range b t #f)]
+      [(b t nofixnum?)
+       (when (and b (not (exact-integer? b)))
+         ($oops 'build-exint-range "~s must be #f of an exact integer" b))
+       (when (and t (not (exact-integer? t)))
+         ($oops 'build-exint-range "~s must be #f of an exact integer" t))
+       (let* ([nofixnum? (or (and nofixnum? #t)
+                             (and b (> b (most-positive-fixnum)))
+                             (and t (< t (most-negative-fixnum))))]
+              [b (or (and nofixnum? (fixnum? b) (+ (most-positive-fixnum) 1))
+                      b)]
+              [t (or (and nofixnum? (fixnum? t) (- (most-negative-fixnum) 1))
+                      t)])
+         (cond
+           [(and b t (> b t))
+            'bottom]
+           [(and b t (= b t))
+            `(qoute b)]
+           [else
+            (make-exint-range b t nofixnum?)]))]))
+
   ; nqm: no question mark
   ; Transform the types used in primdata.ss
   ; to the internal representation used here
@@ -243,20 +279,20 @@
       [sub-symbol '(bottom . symbol)]
       [maybe-sub-symbol (cons false-rec maybe-symbol-pred)]
 
-      [fixnum 'fixnum]
-      [(sub-fixnum bit length sub-length ufixnum sub-ufixnum pfixnum index sub-index u8 s8 u8/s8) '(bottom . fixnum)]
+      [fixnum fixnum-pred]
+      [(sub-fixnum bit length sub-length ufixnum sub-ufixnum pfixnum index sub-index u8 s8 u8/s8) (cons 'bottom fixnum-pred)]
       [maybe-fixnum maybe-fixnum-pred]
       [maybe-ufixnum (cons false-rec maybe-fixnum-pred)]
       [(eof/length eof/u8) (cons eof-rec eof/fixnum-pred)]
-      [bignum 'bignum]
-      [(exact-integer sint) 'exact-integer]
-      [(uint sub-uint nzuint exact-uinteger sub-sint) '(bottom . exact-integer)]
+      [bignum bignum-pred]
+      [(exact-integer sint) exact-integer-pred]
+      [(uint sub-uint nzuint exact-uinteger sub-sint) (cons 'bottom exact-integer-pred)]
       [maybe-uint (cons false-rec maybe-exact-integer-pred)]
       [flonum 'flonum]
       [sub-flonum '(bottom . flonum)]
       [maybe-flonum maybe-flonum-pred]
       [real 'real]
-      [(integer rational) '(exact-integer . real)]
+      [(integer rational) (cons exact-integer-pred 'real)]
       [(uinteger sub-integer) '(bottom . real)]
       [cflonum '(flonum . number)]
       [number 'number]
@@ -422,14 +458,30 @@
        [else
         'normalptr]))
 
-  (define (union/fixnum x)
+  (define (union/exint/quoted x y)
     (cond 
- 	  [(check-constant-is? x target-fixnum?)
- 	   'fixnum]
-	  [(or (eq? x 'bignum)
-		   (eq? x 'exact-integer)
-		   (check-constant-is? x exact-integer?))
-	   'exact-integer]
+ 	  [(check-constant-is? x exact-integer?)
+       (nanopass-case (Lsrc Expr) x
+         [(quote ,d1)
+          (nanopass-case (Lsrc Expr) y
+            [(quote ,d2)
+             (let ([dx d1]
+                   [dy d2])
+               (build-exint-range (min dx dy)
+                                  (max dx dy)
+                                  (and (not (fixnum? dx))
+                                       (not (fixnum? dy)))))])])]
+	  [(exint-range? x)
+       (nanopass-case (Lsrc Expr) y
+         [(quote ,d1)
+          (let ([dy d1])
+            (let ([b (and (exint-range-b x)
+                          (min (exint-range-b x) dy))]
+                  [t (and (exint-range-t x)
+                          (max (exint-range-t x) dy))]
+                  [nofixnum? (and (exint-range-nofixnum? x)
+                                  (not (target-fixnum? dy)))])
+              (build-exint-range b t nofixnum?)))])]
 	  [(or (eq? x 'flonum)
 		   (eq? x 'real)
 		   (check-constant-is? x real?))
@@ -440,34 +492,50 @@
 	  [else
 	   'normalptr]))
 
-  (define (union/bignum x)
+  (define (union/exint x y)
     (cond 
- 	  [(check-constant-is? x target-bignum?)
-	   'bignum]
-	  [(or (eq? x 'fixnum)
-	 	   (eq? x 'exact-integer)
-	 	   (check-constant-is? x exact-integer?))
-	   'exact-integer]
+ 	  [(check-constant-is? x exact-integer?)
+       (nanopass-case (Lsrc Expr) x
+         [(quote ,d)
+          (cond
+           [(and (exint-range-b y)
+                 (< d (exint-range-b y)))
+            (build-exint-range d
+                               (exint-range-t y)
+                               (and (exint-range-nofixnum? y)
+                                    (not (target-fixnum? d))))]
+           [(and (exint-range-t y)
+                 (> d (exint-range-t y)))
+            (build-exint-range (exint-range-b y)
+                               d
+                               (and (exint-range-nofixnum? y)
+                                    (not (target-fixnum? d))))]
+           [(and (exint-range-nofixnum? y)
+                 (target-fixnum? d))
+            (build-exint-range (exint-range-b y)
+                               (exint-range-t y)
+                               #t)]
+           [else y])])]
+	  [(exint-range? x)
+	   (let ([b (and (exint-range-b x)
+                     (exint-range-b y)
+                     (min (exint-range-b x) (exint-range-b y)))]
+             [t (and (exint-range-t x)
+                     (exint-range-t y)
+                     (max (exint-range-t x) (exint-range-t y)))]
+             [nofixnum? (and (exint-range-nofixnum? x)
+                             (exint-range-nofixnum? y))])
+         (if (and (or (and (not b) (not (exint-range-b y)))
+                      (and b (exint-range-b y) (= b (exint-range-b y))))
+                  (or (and (not t) (not (exint-range-t y)))
+                      (and t (exint-range-t y) (= t (exint-range-t y))))
+                  (eq? nofixnum? (exint-range-nofixnum? y)))
+            y
+            (build-exint-range b t nofixnum?)))]
 	  [(or (eq? x 'flonum)
 		   (eq? x 'real)
 		   (check-constant-is? x real?))
-	   'real]
-	  [(or (eq? x 'number)
-		   (check-constant-is? x number?))
-	   'number]
-	  [else
-	   'normalptr]))
-
-  (define (union/exact-integer x)
-    (cond 
-	  [(or (eq? x 'fixnum)
-		   (eq? x 'bignum)
-		   (check-constant-is? x exact-integer?))
-	  'exact-integer]
-	  [(or (eq? x 'flonum)
-		   (eq? x 'real)
-		   (check-constant-is? x real?))
-	   'real]
+ 	   'real]
 	  [(or (eq? x 'number)
 		   (check-constant-is? x number?))
 	   'number]
@@ -489,11 +557,9 @@
 
   (define (union/real x)
     (cond 
-	  [(or (eq? x 'fixnum)
-		   (eq? x 'bignum)
-		   (eq? x 'exact-integer)
-		   (eq? x 'flonum)
-		   (check-constant-is? x real?))
+	  [(or (eq? x 'flonum)
+		   (exint-range? x)
+           (check-constant-is? x real?))
 	   'real]
 	  [(or (eq? x 'number)
 		   (check-constant-is? x number?))
@@ -503,12 +569,10 @@
 
   (define (union/number x)
 	(cond 
-	  [(or (eq? x 'fixnum)
-		   (eq? x 'bignum)
-		   (eq? x 'exact-integer)
-		   (eq? x 'flonum)
+	  [(or (eq? x 'flonum)
 		   (eq? x 'real)
-		   (check-constant-is? x number?))
+		   (exint-range? x)
+           (check-constant-is? x number?))
 	   'number]
 	  [else
 	   'normalptr]))
@@ -527,12 +591,8 @@
           (cond
             [(check-constant-eqv? x dy)
              y]
-			[(fixnum? dy)
-  			 (union/fixnum x)]
-			[(bignum? dy)
-  			 (union/bignum x)]
 		  	[(exact-integer? dy)
-  			 (union/exact-integer x)]
+  			 (union/exint/quoted x y)]
 		  	[(flonum? dy)
   			 (union/flonum x)]
 			[(real? dy)
@@ -549,14 +609,10 @@
             [(flvector? dy) (union/simple x flvector? 'flvector)] ; i.e. '#vfl()
             [else
              'normalptr])])]
+      [(exint-range? y)
+       (union/exint x y)]
       [else
        (case y
-		 [(fixnum)
-  		  (union/fixnum x)]
-		 [(bignum)
-  		  (union/bignum x)]
-		 [(exact-integer)
-  		  (union/exact-integer x)]
 		 [(flonum)
   		  (union/flonum x)]
 		 [(real)
@@ -752,38 +808,65 @@
        [else
         'bottom]))
 
-  (define (intersect/fixnum x check? y)
-     (cond
-       [(and check? (check-constant-is? x fixnum?))
-        x]
-       [(or (eq? x 'fixnum)
-            (eq? x 'exact-integer)
-            (eq? x 'real)
+  (define (intersect/exint/quoted x y)
+    (cond 
+ 	  [(check-constant-is? x exact-integer?)
+       'bottom]
+	  [(exint-range? x)
+       (nanopass-case (Lsrc Expr) y
+         [(quote ,d)
+          (cond
+            [(or (and (exint-range-nofixnum? x)
+                      (not (target-fixnum? d)))
+                 (and (exint-range-b x) 
+                      (> (exint-range-b x) d))
+                 (and (exint-range-t x)
+                      (< (exint-range-t x) d)))
+             'botttom]
+            [else
+             y])])]
+       [(or (eq? x 'real)
             (eq? x 'number))
         y]
        [else
         'bottom]))
 
-  (define (intersect/bignum x check? y)
-     (cond
-       [(and check? (check-constant-is? x bignum?))
-        x]
-       [(or (eq? x 'bignum)
-            (eq? x 'exact-integer)
-            (eq? x 'real)
-            (eq? x 'number))
-        y]
-       [else
-        'bottom]))
-
-  (define (intersect/exact-integer x check? y)
-     (cond
-       [(and check? (or (check-constant-is? x exact-integer?)
-                        (eq? x 'fixnum)
-                        (eq? x 'bignum)))
-        x]
-       [(or (eq? x 'exact-integer)
-            (eq? x 'real)
+  (define (intersect/exint x y)
+    (cond 
+ 	  [(check-constant-is? x exact-integer?)
+       (nanopass-case (Lsrc Expr) x
+         [(quote ,d)
+          (cond
+            [(or (and (exint-range-nofixnum? y)
+                      (not (target-fixnum? d)))
+                 (and (exint-range-b y) 
+                      (> (exint-range-b y) d))
+                 (and (exint-range-t x)
+                      (< (exint-range-t x) d)))
+             'botttom]
+            [else
+             x])])]
+	  [(exint-range? x)
+	   (let ([b (or (and (not (exint-range-b x)) (exint-range-b y))
+                    (and (not (exint-range-b y)) (exint-range-b x))
+                    (and (exint-range-b x)
+                         (exint-range-b y)
+                         (max (exint-range-b x) (exint-range-b y))))]
+	         [t (or (and (not (exint-range-t x)) (exint-range-t y))
+                    (and (not (exint-range-t y)) (exint-range-t x))
+                    (and (exint-range-t x)
+                         (exint-range-t y)
+                         (min (exint-range-t x) (exint-range-t y))))]
+             [nofixnum? (or (exint-range-nofixnum? x)
+                            (exint-range-nofixnum? y))])
+         (if (and (or (and (not b) (not (exint-range-b y)))
+                      (and b (exint-range-b x) (= b (exint-range-b x))))
+                  (or (and (not t) (not (exint-range-t y)))
+                      (and t (exint-range-t x) (= t (exint-range-t x))))
+                  (eq? nofixnum? (exint-range-nofixnum? x)))
+            x
+            (build-exint-range b t nofixnum?)))]
+       [(or (eq? x 'real)
             (eq? x 'number))
         y]
        [else
@@ -803,9 +886,7 @@
   (define (intersect/real x check? y)
      (cond
        [(and check? (or (check-constant-is? x real?)
-                        (eq? x 'fixnum)
-                        (eq? x 'bignum)
-                        (eq? x 'exact-integer)
+                        (exint-range? x)
                         (eq? x 'flonum)))
         x]
        [(or (eq? x 'real)
@@ -816,12 +897,8 @@
 
   (define (intersect/number x check? y)
      (cond
-       [(and check? (eq? x 'fixnum))
-        x]
        [(and check? (or (check-constant-is? x number?)
-                        (eq? x 'fixnum)
-                        (eq? x 'bignum)
-                        (eq? x 'exact-integer)
+                        (exint-range? x)
                         (eq? x 'flonum)
                         (eq? x 'real)))
         x]
@@ -844,12 +921,8 @@
           (cond
             [(check-constant-eqv? x dy)
              x]
-			[(fixnum? dy)
-  			 (intersect/fixnum x #f y)]
-			[(bignum? dy)
-  			 (intersect/bignum x #f y)]
 		  	[(exact-integer? dy)
-  			 (intersect/exact-integer x #f y)]
+  			 (intersect/exint/quoted x y)]
 		  	[(flonum? dy)
   			 (intersect/flonum x #f y)]
 			[(real? dy)
@@ -866,14 +939,10 @@
             [(flvector? dy) (intersect/simple x #f 'flvector y)] ; i.e. '#vfl()
             [else
              'bottom])])]
+      [(exint-range? y)
+       (intersect/exint x y)]
       [else
        (case y
-		 [(fixnum)
-  		  (intersect/fixnum x #t y)]
-		 [(bignum)
-  		  (intersect/bignum x #t y)]
-		 [(exact-integer)
-  		  (intersect/exact-integer x #t y)]
 		 [(flonum)
   		  (intersect/flonum x #t y)]
 		 [(real)

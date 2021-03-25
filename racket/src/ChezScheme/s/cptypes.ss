@@ -529,7 +529,7 @@ Notes:
     (cond
       [(#3%$record? d) '$record] ;check first to avoid double representation of rtd
       [(okay-to-copy? d) ir]
-      [(and (integer? d) (exact? d)) 'exact-integer]
+      [(and (integer? d) (exact? d)) exact-integer-pred]
       [(list? d) '$list-pair] ; quoted list should not be modified.
       [(pair? d) 'pair]
       [(box? d) 'box]
@@ -961,7 +961,7 @@ Notes:
       (define-specialize 2 exact?
         [(n) (let ([r (get-type n)])
                (cond
-                 [(predicate-implies? r 'exact-integer)
+                 [(predicate-implies? r exact-integer-pred)
                   (values (make-seq ctxt n true-rec)
                           true-rec ntypes #f #f)]
                  [(predicate-implies? r 'flonum)
@@ -973,7 +973,7 @@ Notes:
       (define-specialize 2 inexact?
         [(n) (let ([r (get-type n)])
                (cond
-                 [(predicate-implies? r 'exact-integer)
+                 [(predicate-implies? r exact-integer-pred)
                   (values (make-seq ctxt n false-rec)
                           false-rec ntypes #f #f)]
                  [(predicate-implies? r 'flonum)
@@ -985,16 +985,16 @@ Notes:
       (define-specialize 2 zero?
         [(n) (let ([r (get-type n)])
                (cond
-                 [(predicate-implies? r 'bignum)
+                 [(predicate-implies? r bignum-pred)
                   (values (make-seq ctxt n false-rec)
                           false-rec ntypes #f #f)]
-                 [(predicate-implies? r 'fixnum)
+                 [(predicate-implies? r fixnum-pred)
                   (values `(call ,preinfo ,(lookup-primref 3 'fxzero?) ,n)
                           ret
                           ntypes
                           (pred-env-add/ref ntypes n `(quote 0) plxc)
                           #f)]
-                 [(predicate-implies? r 'exact-integer)
+                 [(predicate-implies? r exact-integer-pred)
                   (values `(call ,preinfo ,(lookup-primref 3 'eq?) ,n (quote 0))
                           ret
                           ntypes

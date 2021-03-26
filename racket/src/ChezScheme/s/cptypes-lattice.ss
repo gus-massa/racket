@@ -83,19 +83,66 @@
     (define eof-rec `(quote #!eof))
     (define bwp-rec `(quote #!bwp)))
 
+  ; Use these only for numbers and other predicates included in normalptr.
+  (define (pred->maybe-pred pred)
+    (make-pred-or false-rec pred 'bottom))
+  (define (pred->eof/pred pred)
+    (make-pred-or eof-rec pred 'bottom))
+
+  (define (exact-integer? x)
+    (and (integer? x) (exact? x)))
+
+  (define (interned-symbol? x)
+    (and (symbol? x)
+         (not (gensym? x))
+         (not (uninterned-symbol? x))))
+
+  ; Like min and max, but with the correct result when one of 
+  ; the arguments is +/-inf.0 and the other is a very big bignum.
+  (define (min* x y)
+    (if (> x y) y x))
+  (define (max* x y)
+    (if (< x y) y x))
+
+  (define build-exint-range
+    (case-lambda
+      [(b t)
+       (build-exint-range b t #f)]
+      [(b t nofixnum?)
+       (when (and b (not (exact-integer? b)) (not (eqv? b -inf.0)))
+         ($oops 'build-exint-range "~s must be #f, -inf.0 or an exact integer" b))
+       (when (and t (not (exact-integer? t)) (not (eqv? t +inf.0)))
+         ($oops 'build-exint-range "~s must be #f, +inf.0 or an exact integer" t))
+       (let* ([b (or b -inf.0)]
+              [t (or t +inf.0)]
+              [nofixnum? (or (and nofixnum? #t)
+                             (> b (most-positive-fixnum))
+                             (< t (most-negative-fixnum)))]
+              [b (or (and nofixnum? (fixnum? b) (+ (most-positive-fixnum) 1))
+                     b)]
+              [t (or (and nofixnum? (fixnum? t) (- (most-negative-fixnum) 1))
+                     t)])
+         (cond
+           [(> b t)
+            'bottom]
+           [(= b t)
+            (with-output-language (Lsrc Expr)
+              `(quote ,b))]
+           [else
+            (make-exint-range b t nofixnum?)]))]))
+
+  (define (build-fixnum-range b t)
+    (build-exint-range (or b (most-negative-fixnum))
+                       (or t (most-positive-fixnum))))
+
   (define true-pred (make-pred-or 'true-immediate 'normalptr '$record))
   (define ptr-pred (make-pred-or 'immediate 'normalptr '$record))
   (define null-or-pair-pred (make-pred-or null-rec 'pair 'bottom))
   (define $list-pred (make-pred-or null-rec '$list-pair 'bottom))
-  (define fixnum-pred (build-exint-range (most-negative-fixnum) (most-positive-fixnum)))
-  (define $fixmediate-pred (make-pred-or 'immediate fixnum-pred 'bottom))
-  (define maybe-fixnum-pred (make-pred-or false-rec fixnum-pred 'bottom))
-  (define eof/fixnum-pred (make-pred-or eof-rec fixnum-pred 'bottom))
+  (define fixnum-pred (build-fixnum-range #f #f))
   (define bignum-pred (build-exint-range #f #f #t))
   (define exact-integer-pred (build-exint-range #f #f))
-  (define maybe-exact-integer-pred (make-pred-or false-rec exact-integer-pred 'bottom))
-  (define maybe-flonum-pred (make-pred-or false-rec 'flonum 'bottom))
-  (define maybe-number-pred (make-pred-or false-rec 'number 'bottom))
+  (define $fixmediate-pred (make-pred-or 'immediate fixnum-pred 'bottom))
   (define maybe-symbol-pred (make-pred-or false-rec 'symbol 'bottom))
   (define maybe-procedure-pred (make-pred-or false-rec 'procedure 'bottom))
   (define maybe-string-pred (make-pred-or false-rec 'string 'bottom))
@@ -180,30 +227,6 @@
                           [else
                            (loop lo i)]))]))]))]))
 
-  (define build-exint-range
-    (case-lambda
-      [(b t)
-       (build-exint-range b t #f)]
-      [(b t nofixnum?)
-       (when (and b (not (exact-integer? b)))
-         ($oops 'build-exint-range "~s must be #f of an exact integer" b))
-       (when (and t (not (exact-integer? t)))
-         ($oops 'build-exint-range "~s must be #f of an exact integer" t))
-       (let* ([nofixnum? (or (and nofixnum? #t)
-                             (and b (> b (most-positive-fixnum)))
-                             (and t (< t (most-negative-fixnum))))]
-              [b (or (and nofixnum? (fixnum? b) (+ (most-positive-fixnum) 1))
-                      b)]
-              [t (or (and nofixnum? (fixnum? t) (- (most-negative-fixnum) 1))
-                      t)])
-         (cond
-           [(and b t (> b t))
-            'bottom]
-           [(and b t (= b t))
-            `(qoute b)]
-           [else
-            (make-exint-range b t nofixnum?)]))]))
-
   ; nqm: no question mark
   ; Transform the types used in primdata.ss
   ; to the internal representation used here
@@ -280,24 +303,42 @@
       [maybe-sub-symbol (cons false-rec maybe-symbol-pred)]
 
       [fixnum fixnum-pred]
-      [(sub-fixnum bit length sub-length ufixnum sub-ufixnum pfixnum index sub-index u8 s8 u8/s8) (cons 'bottom fixnum-pred)]
-      [maybe-fixnum maybe-fixnum-pred]
-      [maybe-ufixnum (cons false-rec maybe-fixnum-pred)]
-      [(eof/length eof/u8) (cons eof-rec eof/fixnum-pred)]
+      [sub-fixnum (cons 'bottom fixnum-pred)]
+      [maybe-fixnum (pred->maybe-pred fixnum-pred)]
+      ; It's not very clear beacuse the maximal length of each container is different,
+      ; and also it's not clear what a sefe value, so let's be conservative here.
+      [(length sub-length index sub-index) (cons 'bottom (build-fixnum-range 0 #f))]
+      [eof/length (cons eof-rec (pred->eof/pred (build-fixnum-range 0 #f)))]
+      [ufixnum (build-fixnum-range 0 #f)]
+      [sub-ufixnum (cons 'bottom (build-fixnum-range 0 #f))]
+      [maybe-ufixnum (pred->maybe-pred (build-fixnum-range 0 #f))]
+      [pfixnum (build-fixnum-range 1 #f)]
+      [u8 (build-exint-range 0 255)]
+      [s8 (build-exint-range -128 127)]
+      [u8/s8 (build-exint-range -128 255)]
+      [eof/u8 (pred->eof/pred (build-exint-range 0 255))]
+      [bit (build-exint-range 0 1)]
+
       [bignum bignum-pred]
       [(exact-integer sint) exact-integer-pred]
-      [(uint sub-uint nzuint exact-uinteger sub-sint) (cons 'bottom exact-integer-pred)]
-      [maybe-uint (cons false-rec maybe-exact-integer-pred)]
+      [sub-sint (cons 'bottom exact-integer-pred)]
+      [(uint exact-uinteger) (build-exint-range 0 #f)]
+      [sub-uint (cons 'bottom (build-exint-range 0 #f))]
+      [maybe-uint (pred->maybe-pred (build-exint-range 0 #f))]
+      [nzuint (build-exint-range 1 #f)]
+
       [flonum 'flonum]
       [sub-flonum '(bottom . flonum)]
-      [maybe-flonum maybe-flonum-pred]
+      [maybe-flonum (pred->maybe-pred 'flonum)]
       [real 'real]
-      [(integer rational) (cons exact-integer-pred 'real)]
-      [(uinteger sub-integer) '(bottom . real)]
+      [rational (cons exact-integer-pred 'real)]
+      [integer (cons exact-integer-pred 'real)]
+      [sub-integer '(bottom . real)]
+      [uinteger (cons (build-exint-range 0 #f) 'real)]
       [cflonum '(flonum . number)]
       [number 'number]
       [sub-number '(bottom . number)]
-      [maybe-number maybe-number-pred]
+      [maybe-number (pred->maybe-pred 'number)]
 
       [$record '$record]
       [(record rtd) '(bottom . $record)] ; not sealed
@@ -320,14 +361,6 @@
          (nanopass-case (Lsrc Expr) x
            [(quote ,d) (eqv? d v)]
            [else #f])))
-
-  (define (exact-integer? x)
-    (and (integer? x) (exact? x)))
-
-  (define (interned-symbol? x)
-    (and (symbol? x)
-         (not (gensym? x))
-         (not (uninterned-symbol? x))))
 
   ;only false-rec, boolean, maybe-char and immediate may be '#f
   ;use when the other argument is truthy bur not exactly '#t
@@ -467,18 +500,16 @@
             [(quote ,d2)
              (let ([dx d1]
                    [dy d2])
-               (build-exint-range (min dx dy)
-                                  (max dx dy)
+               (build-exint-range (min* dx dy)
+                                  (max* dx dy)
                                   (and (not (fixnum? dx))
                                        (not (fixnum? dy)))))])])]
 	  [(exint-range? x)
        (nanopass-case (Lsrc Expr) y
          [(quote ,d1)
           (let ([dy d1])
-            (let ([b (and (exint-range-b x)
-                          (min (exint-range-b x) dy))]
-                  [t (and (exint-range-t x)
-                          (max (exint-range-t x) dy))]
+            (let ([b (min* (exint-range-b x) dy)]
+                  [t (max* (exint-range-t x) dy)]
                   [nofixnum? (and (exint-range-nofixnum? x)
                                   (not (target-fixnum? dy)))])
               (build-exint-range b t nofixnum?)))])]
@@ -498,14 +529,12 @@
        (nanopass-case (Lsrc Expr) x
          [(quote ,d)
           (cond
-           [(and (exint-range-b y)
-                 (< d (exint-range-b y)))
+           [(< d (exint-range-b y))
             (build-exint-range d
                                (exint-range-t y)
                                (and (exint-range-nofixnum? y)
                                     (not (target-fixnum? d))))]
-           [(and (exint-range-t y)
-                 (> d (exint-range-t y)))
+           [(> d (exint-range-t y))
             (build-exint-range (exint-range-b y)
                                d
                                (and (exint-range-nofixnum? y)
@@ -517,18 +546,12 @@
                                #t)]
            [else y])])]
 	  [(exint-range? x)
-	   (let ([b (and (exint-range-b x)
-                     (exint-range-b y)
-                     (min (exint-range-b x) (exint-range-b y)))]
-             [t (and (exint-range-t x)
-                     (exint-range-t y)
-                     (max (exint-range-t x) (exint-range-t y)))]
+	   (let ([b (min* (exint-range-b x) (exint-range-b y))]
+             [t (max* (exint-range-t x) (exint-range-t y))]
              [nofixnum? (and (exint-range-nofixnum? x)
                              (exint-range-nofixnum? y))])
-         (if (and (or (and (not b) (not (exint-range-b y)))
-                      (and b (exint-range-b y) (= b (exint-range-b y))))
-                  (or (and (not t) (not (exint-range-t y)))
-                      (and t (exint-range-t y) (= t (exint-range-t y))))
+         (if (and (= b (exint-range-b y))
+                  (= t (exint-range-t y))
                   (eq? nofixnum? (exint-range-nofixnum? y)))
             y
             (build-exint-range b t nofixnum?)))]
@@ -818,11 +841,9 @@
           (cond
             [(or (and (exint-range-nofixnum? x)
                       (not (target-fixnum? d)))
-                 (and (exint-range-b x) 
-                      (> (exint-range-b x) d))
-                 (and (exint-range-t x)
-                      (< (exint-range-t x) d)))
-             'botttom]
+                 (> (exint-range-b x) d)
+                 (< (exint-range-t x) d))
+             'bottom]
             [else
              y])])]
        [(or (eq? x 'real)
@@ -839,30 +860,18 @@
           (cond
             [(or (and (exint-range-nofixnum? y)
                       (not (target-fixnum? d)))
-                 (and (exint-range-b y) 
-                      (> (exint-range-b y) d))
-                 (and (exint-range-t x)
-                      (< (exint-range-t x) d)))
-             'botttom]
+                 (> (exint-range-b y) d)
+                 (< (exint-range-t y) d))
+             'bottom]
             [else
              x])])]
 	  [(exint-range? x)
-	   (let ([b (or (and (not (exint-range-b x)) (exint-range-b y))
-                    (and (not (exint-range-b y)) (exint-range-b x))
-                    (and (exint-range-b x)
-                         (exint-range-b y)
-                         (max (exint-range-b x) (exint-range-b y))))]
-	         [t (or (and (not (exint-range-t x)) (exint-range-t y))
-                    (and (not (exint-range-t y)) (exint-range-t x))
-                    (and (exint-range-t x)
-                         (exint-range-t y)
-                         (min (exint-range-t x) (exint-range-t y))))]
+	   (let ([b (max* (exint-range-b x) (exint-range-b y))]
+	         [t (min* (exint-range-t x) (exint-range-t y))]
              [nofixnum? (or (exint-range-nofixnum? x)
                             (exint-range-nofixnum? y))])
-         (if (and (or (and (not b) (not (exint-range-b y)))
-                      (and b (exint-range-b x) (= b (exint-range-b x))))
-                  (or (and (not t) (not (exint-range-t y)))
-                      (and t (exint-range-t x) (= t (exint-range-t x))))
+         (if (and (= b (exint-range-b x))
+                  (= t (exint-range-t x))
                   (eq? nofixnum? (exint-range-nofixnum? x)))
             x
             (build-exint-range b t nofixnum?)))]

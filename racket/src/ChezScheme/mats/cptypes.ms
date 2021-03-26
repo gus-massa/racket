@@ -1243,8 +1243,20 @@
     '(lambda (p) (define x (get-char p)) (box? x))
     '(lambda (p) (define x (get-char p)) #f))
 (cptypes-equivalent-expansion?
-    '(lambda (p) (define x (get-u8 p)) (when (number? p) (fixnum? p)))
-    '(lambda (p) (define x (get-u8 p)) (when (number? p) #t)))
+    '(lambda (p) (define x (get-u8 p)) (when (number? x) (fixnum? x)))
+    '(lambda (p) (define x (get-u8 p)) (when (number? x) #t)))
+(cptypes-equivalent-expansion?
+    '(lambda (p) (define x (get-u8 p)) (eq? x 256))
+    '(lambda (p) (define x (get-u8 p)) #f))
+(cptypes-equivalent-expansion?
+    '(lambda (p) (define x (get-u8 p)) (eq? x -1))
+    '(lambda (p) (define x (get-u8 p)) #f))
+(not (cptypes-equivalent-expansion?
+       '(lambda (p) (define x (get-u8 p)) (when (eq? x 128) 1))
+       '(lambda (p) (define x (get-u8 p)) (when (eq? x 128) 2))))
+(not (cptypes-equivalent-expansion?
+       '(lambda (p) (define x (get-u8 p)) (unless (eq? x 128) 1))
+       '(lambda (p) (define x (get-u8 p)) (unless (eq? x 128) 2))))
 )
 
 (mat cptypes-unreachable

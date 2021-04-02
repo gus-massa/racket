@@ -826,6 +826,20 @@ Notes:
             [(_ id) (or (lookup #'id #'get-type-key)
                         ($oops 'get-type "invalid identifier ~s" #'id))])))
 
+    (define (predicate->exint-bounds x)
+      (cond
+        [(exint-range? x)
+         (values (exint-range-b x) (exint-range-t x) (exint-range-nofixnum? x))]
+        [(and (Lsrc? x)
+              (nanopass-case (Lsrc Expr) x
+                [(quote ,d)
+                 (guard (and (integer? d) (exact? d)))
+                 d]
+                [else #f]))
+         => (lambda (d) (values d d (target-fixnum? d)))]
+        [else
+         ($oops 'predicate->exint-bounds "invalid exint type ~s" x)]))
+
       (define (try-compare-constants e1 e2 prim-name)
         ; yes     => true-rec
         ; no      => false-rec
@@ -838,17 +852,16 @@ Notes:
                   [(quote ,d2)
                    (cond
                      [(eqv? d1 d2)
-                      (cond
-                        [(eq? prim-name 'eq?)
-                         (cond
-                           [(or (not (number? d1))
-                                ; To avoid problems with cross compilation and eq?-ness
-                                ; ensure that it's a fixnum in both machines.
-                                (and (fixnum? d1)
-                                     (target-fixnum? d1)))
-                            true-rec]
-                           [else
-                            #f])]
+                      (case prim-name
+                        ['fx=
+                         true-rec]
+                        ['eq?
+                         (and (or (not (number? d1))
+                                  ; To avoid problems with cross compilation and eq?-ness
+                                  ; ensure that it's a fixnum in both machines.
+                                  (and (fixnum? d1)
+                                       (target-fixnum? d1)))
+                              true-rec)]
                         [else
                          true-rec])]
                      [else
@@ -856,26 +869,86 @@ Notes:
                   [else #f])]
                [else #f])))
 
-      (define-specialize 2 (eq? eqv?)
-        [(e1 e2) (let ([r1 (get-type e1)]
-                       [r2 (get-type e2)])
-                    (cond
-                      [(try-compare-constants r1 r2 prim-name)
-                       => (lambda (ret)
-                            (values (make-seq ctxt e1 e2 ret)
-                                    ret ntypes #f #f))]
-                      [(predicate-disjoint? r2 r1)
-                       (values (make-seq ctxt e1 e2 false-rec)
-                               false-rec ntypes #f #f)]
-                      [else
-                       (values `(call ,preinfo ,pr ,e1 ,e2)
-                               ret
-                               ntypes
-                               (and (eq? ctxt 'test)
-                                    (pred-env-add/ref
-                                     (pred-env-add/ref ntypes e1 r2 plxc)
-                                     e2 r1 plxc))
-                               #f)]))])
+      (define-specialize 2 (eq? eqv? fx=)
+        [(e) (if (fx= level 3) ; single argument only valid for fx=
+                 (values (make-seq ctxt e true-rec)
+                         true-rec ntypes #f #f)
+                 (values `(call ,preinfo ,pr ,e)
+                         ret ntypes #f #f))]
+        [e* (let* ([r* (get-type e*)]
+                   [nr* (if (eq? prim-name 'fx=)
+                           (map (lambda (r) (predicate-intersect r fixnum-pred)) r*)
+                           r*)]
+                   [nr-int (fold-left predicate-intersect ptr-pred nr*)]
+                   [unsafe (or (fx= level 3) (not (eq? prim-name 'fx=)))])
+              (cond
+                [(predicate-implies? nr-int 'bottom)
+                 (cond
+                   [unsafe
+                    (values (make-1seq ctxt (make-1seq* 'effect e*) false-rec)
+                            false-rec ntypes #f #f)]
+                   [else
+                    (let loop ([r* r*]
+                               [e* e*]
+                               [drop* '()]
+                               [keep* '()])
+                      (cond
+                        [(null? e*)
+                         (cond
+                           [(null? keep*)
+                            (values (make-1seq ctxt (make-1seq* 'effect drop*) false-rec)
+                                    false-rec ntypes #f #f)]
+                           [else
+                            (values (make-1seq ctxt
+                                               (make-1seq* 'effect drop*)
+                                               `(call ,preinfo ,pr ,keep* ...)
+                                               false-rec)
+                                    false-rec ntypes #f #f)])]
+                        [else
+                         (if (predicate-implies? (car r*) fixnum-pred) ; only fx= can be not unsafe
+                             (loop (cdr r*) (cdr e*) (cons (car e*) drop*) keep*)
+                             (loop (cdr r*) (cdr e*) drop* (cons (car e*) keep*)))]))])]
+                [(check-constant-is? nr-int (lambda (x) #t)) ;just check it is any constant
+                 (let ([ttypes (fold-left (lambda (x e) (pred-env-add/ref x e nr-int plxc)) ntypes e*)])
+                   (let loop ([r* r*]
+                              [nr* nr*]
+                              [e* e*]
+                              [true #t]
+                              [drop* '()]
+                              [keep* '()]
+                              [nrkeep* '()])
+                     (cond
+                       [(null? e*)
+                        (let* ([ir (cond
+                                     [(null? drop*)
+                                      `(call ,preinfo ,pr ,(reverse keep*) ...)]
+                                     [(null? keep*)
+                                      (make-1seq* (if true 'effect ctxt) (reverse drop*))]
+                                     [else
+                                      (let ([keep* (if (check-constant-is? (fold-left predicate-intersect ptr-pred nrkeep*)
+                                                                           (lambda (x) #t))
+                                                       keep*
+                                                       (cons nr-int keep*))])
+                                        (make-seq (if true 'effect ctxt)
+                                                  (make-1seq* 'effect (reverse drop*))
+                                                  `(call ,preinfo ,pr ,(reverse keep*) ...)))])]
+                               [ir (if true (make-seq ctxt ir true-rec) ir)])
+                          (values ir (if true true-rec ret) ntypes ttypes #f))]
+                       [else
+                        (if (predicate-implies? (try-compare-constants (car nr*) nr-int prim-name) true-rec)
+                            (if (or unsafe (predicate-implies? (car r*) fixnum-pred)) ; only fx= can be not unsafe
+                                (loop (cdr r*) (cdr nr*) (cdr e*) true
+                                      (cons (car e*) drop*) keep* nrkeep*)
+                                (loop (cdr r*) (cdr nr*) (cdr e*) true
+                                      drop* (cons (car e*) keep*) (cons (car nr*) nrkeep*)))
+                            (loop (cdr r*) (cdr nr*) (cdr e*) #f
+                                  drop* (cons (car e*) keep*) (cons (car nr*) nrkeep*)))])))]
+                [else
+                   (values `(call ,preinfo ,pr ,e* ...)
+                           ret
+                           ntypes
+                           (fold-left (lambda (x e) (pred-env-add/ref x e nr-int plxc)) ntypes e*)
+                           #f)]))])
 
       (define-specialize 2 list
         [() (values null-rec null-rec ntypes #f #f)] ; should have been reduced by cp0
@@ -983,11 +1056,35 @@ Notes:
                   (values `(call ,preinfo ,pr ,n) ret ntypes #f #f)]))])
 
       (define-specialize 2 zero?
-        [(n) (let ([r (get-type n)])
+        [(n) (let ([r (predicate-intersect (get-type n) 'number)]
+                   [ir `(call ,preinfo ,pr ,n)])
                (cond
-                 [(predicate-implies? r bignum-pred)
+                 [(predicate-implies? r exact-integer-pred)
+                  (cond
+                    [(predicate-disjoint? r `(quote 0))
+                     (values (make-seq ctxt ir false-rec)
+                             false-rec ntypes #f #f)]
+                   [(predicate-implies? r `(quote 0))
+                    (values (make-seq ctxt ir true-rec)
+                            true-rec ntypes #f #f)]
+                   [else
+                    (values ir 
+                            ret
+                            ntypes
+                            (pred-env-add/ref ntypes n `(quote 0) plxc)
+                            #f)])]
+                 [else
+                  (values ir ret ntypes #f #f)]))])
+
+      (define-specialize 3 zero?
+        [(n) (let ([r (predicate-intersect (get-type n) 'number)])
+               (cond
+                 [(predicate-disjoint? r `(quote 0))
                   (values (make-seq ctxt n false-rec)
                           false-rec ntypes #f #f)]
+                 [(predicate-implies? r `(quote 0))
+                  (values (make-seq ctxt n true-rec)
+                          true-rec ntypes #f #f)]
                  [(predicate-implies? r fixnum-pred)
                   (values `(call ,preinfo ,(lookup-primref 3 'fxzero?) ,n)
                           ret
@@ -1010,11 +1107,126 @@ Notes:
                   (values `(call ,preinfo ,pr ,n) ret ntypes #f #f)]))])
 
       (define-specialize 2 fxzero?
-        [(n) (values `(call ,preinfo ,pr ,n)
-                     ret
-                     ntypes
-                     (pred-env-add/ref ntypes n `(quote 0) plxc)
-                     #f)])
+        [(n) (let ([r (predicate-intersect (get-type n) fixnum-pred)])
+               (cond
+                 [(predicate-disjoint? r `(quote 0))
+                  (values (make-seq ctxt n false-rec)
+                          false-rec ntypes #f #f)]
+                 [(predicate-implies? r `(quote 0))
+                  (values (make-seq ctxt n true-rec)
+                          true-rec ntypes #f #f)]
+                 [else
+                  (values `(call ,preinfo ,pr ,n)
+                          ret
+                          ntypes
+                          (pred-env-add/ref ntypes n `(quote 0) plxc)
+                          #f)]))])
+
+      (let ()
+        (define (fold-fx/1 x rx
+                           handler
+                           preinfo pr ret ntypes)
+          (let*-values ([(nx) (predicate-intersect rx fixnum-pred)]
+                        [(xmin xmax xnf?) (predicate->exint-bounds nx)]
+                        [(nofixnum?) #f] ; could be more precise
+                        [(rmin rmax) (handler xmin xmax)]
+                        [(r) (build-exint-range rmin rmax nofixnum?)]
+                        [(to-unsafe) (and (not (all-set? (prim-mask unsafe) (primref-flags pr)))
+                                          (predicate-implies? rx fixnum-pred)
+                                          (predicate-implies? r fixnum-pred))]
+                        [(r) (predicate-intersect r fixnum-pred)]
+                        [(pr) (if to-unsafe
+                                  (primref->unsafe-primref pr)
+                                  pr)])
+            (values `(call ,preinfo ,pr ,x) r ntypes #f #f)))
+
+        (define (fold-fx/2 x y rx ry
+                           handler
+                           preinfo pr ret ntypes)
+          (let*-values ([(nx) (predicate-intersect rx fixnum-pred)]
+                        [(ny) (predicate-intersect ry fixnum-pred)]
+                        [(xmin xmax xnf?) (predicate->exint-bounds nx)]
+                        [(ymin ymax ynf?) (predicate->exint-bounds ny)]
+                        [(nofixnum?) #f] ; could be more precise
+                        [(rmin rmax) (handler xmin xmax ymin ymax)]
+                        [(r) (build-exint-range rmin rmax nofixnum?)]
+                        [(to-unsafe) (and (not (all-set? (prim-mask unsafe) (primref-flags pr)))
+                                          (predicate-implies? rx fixnum-pred)
+                                          (predicate-implies? ry fixnum-pred)
+                                          (predicate-implies? r fixnum-pred))]
+                        [(r) (predicate-intersect r fixnum-pred)]
+                        [(pr) (if to-unsafe
+                                  (primref->unsafe-primref pr)
+                                  pr)])
+            (values `(call ,preinfo ,pr ,x ,y) r ntypes #f #f)))
+
+        (define (fold-fx/* x* rx*
+                           handler
+                           preinfo pr ret ntypes)
+          (let* ([nx* (map (lambda (rx) (predicate-intersect rx fixnum-pred)) rx*)])
+            (let loop ([r (car nx*)]
+                       [nx* (cdr nx*)]
+                       [to-unsafe (and (not (all-set? (prim-mask unsafe) (primref-flags pr)))
+                                       (andmap (lambda (rx) (predicate-implies? rx fixnum-pred)) rx*))])
+              (cond
+                [(null? nx*)
+                 (let ([pr (if to-unsafe
+                               (primref->unsafe-primref pr)
+                               pr)])
+                    (values `(call ,preinfo ,pr ,x* ...) r ntypes #f #f))]
+                [else
+                 (let*-values ([(xmin xmax xnf?) (predicate->exint-bounds r)]
+                               [(ymin ymax ynf?) (predicate->exint-bounds (car nx*))]
+                               [(nofixnum?) #f] ; could be more precise
+                               [(rmin rmax) (handler xmin xmax ymin ymax)]
+                               [(r) (build-exint-range rmin rmax nofixnum?)]
+                               [(to-unsafe) (and to-unsafe
+                                                 (predicate-implies? r fixnum-pred))]
+                               [(r) (predicate-intersect r fixnum-pred)])
+                   (loop r (cdr nx*) to-unsafe))]))))
+
+        (define-specialize 2 r6rs:fx+
+          [(x y) (fold-fx/* (list x y) (list (get-type x) (get-type y))
+                            (lambda (xmin xmax ymin ymax)
+                              (values (+ xmin ymin) (+ xmax ymax)))
+                            preinfo pr ret ntypes)])
+
+        (define-specialize 2 fx+
+          [() (values `(quote 0) `(quote 0) ntypes #f #f)]
+          [x* (fold-fx/* x* (get-type x*)
+                         (lambda (xmin xmax ymin ymax)
+                           (values (+ xmin ymin) (+ xmax ymax)))
+                         preinfo pr ret ntypes)])
+
+        (define-specialize 2 r6rs:fx-
+          [(x y) (fold-fx/* (list x y) (list (get-type x) (get-type y))
+                            (lambda (xmin xmax ymin ymax)
+                              (values (- xmin ymax) (- xmax ymin)))
+                            preinfo pr ret ntypes)])
+
+        (define-specialize 2 fx-
+          [() (values `(quote 0) `(quote 0) ntypes #f #f)]
+          [(x) (fold-fx/1 x (get-type x)
+                             (lambda (xmin xmax)
+                               (values (- xmax) (- xmin)))
+                             preinfo pr ret ntypes)]
+          [x* (fold-fx/* x* (get-type x*)
+                         (lambda (xmin xmax ymin ymax)
+                           (values (- xmin ymax) (- xmax ymin)))
+                         preinfo pr ret ntypes)])
+
+        (define-specialize 2 fx1+
+          [(x) (fold-fx/1 x (get-type x)
+                          (lambda (xmin xmax)
+                            (values (+ xmin 1) (+ xmax 1)))
+                          preinfo pr ret ntypes)])
+
+        (define-specialize 2 fx1-
+          [(x) (fold-fx/1 x (get-type x)
+                          (lambda (xmin xmax)
+                            (values (- xmin 1) (- xmax 1)))
+                          preinfo pr ret ntypes)])
+      )
 
       (define-specialize 2 atan
         [(n) (let ([r (get-type n)])

@@ -51,7 +51,12 @@
    predicate-intersect
    predicate-union
    make-pred-$record/rtd
-   make-pred-$record/ref)
+   make-pred-$record/ref
+   build-exint-range
+   exint-range?
+   exint-range-b
+   exint-range-t
+   exint-range-nofixnum?)
 
   (define-record-type pred-or
     (fields imm nor rec)
@@ -1045,7 +1050,6 @@
           (intersect/record x y)]
          [else
           'bottom])]))
-
 
   (define (predicate-implies? x y)
     (eq? (predicate-union x y) y))

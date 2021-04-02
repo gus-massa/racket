@@ -216,6 +216,18 @@
   (cptypes-equivalent-expansion?
     '(lambda (x) (when (and (fixnum? x) (zero? x)) x))
     '(lambda (x) (when (and (fixnum? x) (zero? x)) 0)))
+  (not (cptypes-equivalent-expansion?
+         '(lambda (x) (when (symbol? x) (#2%zero? x)))
+         '(lambda (x) (when (symbol? x) #f))))
+  (not (cptypes-equivalent-expansion?
+         '(lambda (x) (when (symbol? x) (#2%zero? x)))
+         '(lambda (x) (when (symbol? x) #t))))
+  (not (cptypes-equivalent-expansion?
+         '(lambda (x) (when (or (symbol? x) (eq? x 0)) (#2%zero? x)))
+         '(lambda (x) (when (or (symbol? x) (eq? x 0)) #f))))
+  (not (cptypes-equivalent-expansion?
+         '(lambda (x) (when (or (symbol? x) (eq? x 0)) (#2%zero? x)))
+         '(lambda (x) (when (or (symbol? x) (eq? x 0)) #t))))
   (cptypes-equivalent-expansion?
     '(lambda (x f) (when (list-assuming-immutable? x) (f x) (list-assuming-immutable? x)))
     '(lambda (x f) (when (list-assuming-immutable? x) (f x) #t)))
@@ -1242,21 +1254,39 @@
   (cptypes-equivalent-expansion?
     '(lambda (p) (define x (get-char p)) (box? x))
     '(lambda (p) (define x (get-char p)) #f))
-(cptypes-equivalent-expansion?
-    '(lambda (p) (define x (get-u8 p)) (when (number? x) (fixnum? x)))
-    '(lambda (p) (define x (get-u8 p)) (when (number? x) #t)))
-(cptypes-equivalent-expansion?
-    '(lambda (p) (define x (get-u8 p)) (eq? x 256))
-    '(lambda (p) (define x (get-u8 p)) #f))
-(cptypes-equivalent-expansion?
-    '(lambda (p) (define x (get-u8 p)) (eq? x -1))
-    '(lambda (p) (define x (get-u8 p)) #f))
-(not (cptypes-equivalent-expansion?
-       '(lambda (p) (define x (get-u8 p)) (when (eq? x 128) 1))
-       '(lambda (p) (define x (get-u8 p)) (when (eq? x 128) 2))))
-(not (cptypes-equivalent-expansion?
-       '(lambda (p) (define x (get-u8 p)) (unless (eq? x 128) 1))
-       '(lambda (p) (define x (get-u8 p)) (unless (eq? x 128) 2))))
+  (cptypes-equivalent-expansion?
+      '(lambda (p) (define x (get-u8 p)) (when (number? x) (fixnum? x)))
+      '(lambda (p) (define x (get-u8 p)) (when (number? x) #t)))
+)
+
+(mat cptypes-fx
+  (cptypes-equivalent-expansion?
+      '(lambda (p) (define x (get-u8 p)) (eq? x 256))
+      '(lambda (p) (define x (get-u8 p)) #f))
+  (cptypes-equivalent-expansion?
+      '(lambda (p) (define x (get-u8 p)) (eq? x -1))
+      '(lambda (p) (define x (get-u8 p)) #f))
+  (not (cptypes-equivalent-expansion?
+         '(lambda (p) (define x (get-u8 p)) (when (eq? x 128) 1))
+         '(lambda (p) (define x (get-u8 p)) (when (eq? x 128) 2))))
+  (not (cptypes-equivalent-expansion?
+         '(lambda (p) (define x (get-u8 p)) (unless (eq? x 128) 1))
+         '(lambda (p) (define x (get-u8 p)) (unless (eq? x 128) 2))))
+  (cptypes-equivalent-expansion?
+   '(lambda (v) (define x (vector-length v)) (fx= x -1))
+   '(lambda (v) (define x (vector-length v)) #f))
+  (cptypes-equivalent-expansion?
+   '(lambda (v) (define x (fx+ (vector-length v) 10)) (fx= x 5))
+   '(lambda (v) (define x (fx+ (vector-length v) 10)) #f))
+  (cptypes-equivalent-expansion?
+   '(lambda (v) (define x (vector-length v)) (fx= x (fx- x) 7))
+   '(lambda (v) (define x (vector-length v)) #f))
+  (cptypes-equivalent-expansion?
+   '(lambda (v) (define x (vector-length v)) (fx= x (fx- x) 0))
+   '(lambda (v) (define x (vector-length v)) (fx= x (fx- x))))
+  (cptypes-equivalent-expansion?
+   '(lambda (v n) (define x (vector-length v)) (when (fx= x (fx- x) n) (zero? n)))
+   '(lambda (v n) (define x (vector-length v)) (when (fx= x (fx- x) n) #t)))
 )
 
 (mat cptypes-unreachable

@@ -53,8 +53,8 @@
   (fxmax [sig [(fixnum fixnum ...) -> (fixnum)]] [flags arith-op cp02 safeongoodargs])
   (fxmin [sig [(fixnum fixnum ...) -> (fixnum)]] [flags arith-op cp02 safeongoodargs])
   ((r6rs: fx*) [sig [(fixnum fixnum) -> (fixnum)]] [flags arith-op partial-folder])  ; restricted to 2 arguments
-  ((r6rs: fx+) [sig [(fixnum fixnum) -> (fixnum)]] [flags arith-op partial-folder])  ; restricted to 2 arguments
-  ((r6rs: fx-) [sig [(fixnum) (fixnum fixnum) -> (fixnum)]] [flags arith-op partial-folder])  ; restricted to 1 or 2 arguments
+  ((r6rs: fx+) [sig [(fixnum fixnum) -> (fixnum)]] [flags arith-op partial-folder cptypes2])  ; restricted to 2 arguments
+  ((r6rs: fx-) [sig [(fixnum) (fixnum fixnum) -> (fixnum)]] [flags arith-op partial-folder cptypes2])  ; restricted to 1 or 2 arguments
   (fxdiv-and-mod [sig [(fixnum fixnum) -> (fixnum fixnum)]] [flags discard cp03])
   (fxdiv [sig [(fixnum fixnum) -> (fixnum)]] [flags arith-op cp02])
   (fxmod [sig [(fixnum fixnum) -> (fixnum)]] [flags arith-op cp02])
@@ -1369,16 +1369,16 @@
   (ftype-pointer->sexpr [sig [(ftype-pointer) -> (ptr)]] [flags])
   (fx* [sig [(fixnum ...) -> (fixnum)]] [flags arith-op partial-folder])  ; not restricted to 2 arguments
   (fx*/wraparound [sig [(fixnum fixnum) -> (fixnum)]] [flags arith-op partial-folder safeongoodargs])
-  (fx+ [sig [(fixnum ...) -> (fixnum)]] [flags arith-op partial-folder])  ; not restricted to 2 arguments
+  (fx+ [sig [(fixnum ...) -> (fixnum)]] [flags arith-op partial-folder cptypes2])  ; not restricted to 2 arguments
   (fx+/wraparound [sig [(fixnum fixnum) -> (fixnum)]] [flags arith-op partial-folder safeongoodargs])
-  (fx- [sig [(fixnum fixnum ...) -> (fixnum)]] [flags arith-op partial-folder])  ; not restricted to 1 or 2 arguments
+  (fx- [sig [(fixnum fixnum ...) -> (fixnum)]] [flags arith-op partial-folder cptypes2])  ; not restricted to 1 or 2 arguments
   (fx-/wraparound [sig [(fixnum fixnum) -> (fixnum)]] [flags arith-op partial-folder safeongoodargs])
   (fx/ [sig [(fixnum fixnum ...) -> (fixnum)]] [flags arith-op partial-folder])  ; not restricted to 1 or 2 arguments
-  (fx1+ [sig [(fixnum) -> (fixnum)]] [flags arith-op cp02])
-  (fx1- [sig [(fixnum) -> (fixnum)]] [flags arith-op cp02])
+  (fx1+ [sig [(fixnum) -> (fixnum)]] [flags arith-op cp02 cptypes2])
+  (fx1- [sig [(fixnum) -> (fixnum)]] [flags arith-op cp02 cptypes2])
   (fx< [sig [(fixnum fixnum ...) -> (boolean)]] [flags pure cp02 safeongoodargs])   ; not restricted to 2+ arguments
   (fx<= [sig [(fixnum fixnum ...) -> (boolean)]] [flags pure cp02 safeongoodargs])  ; not restricted to 2+ arguments
-  (fx= [sig [(fixnum fixnum ...) -> (boolean)]] [flags pure cp02 safeongoodargs])   ; not restricted to 2+ arguments
+  (fx= [sig [(fixnum fixnum ...) -> (boolean)]] [flags pure cp02 safeongoodargs cptypes2])   ; not restricted to 2+ arguments
   (fx> [sig [(fixnum fixnum ...) -> (boolean)]] [flags pure cp02 safeongoodargs])   ; not restricted to 2+ arguments
   (fx>= [sig [(fixnum fixnum ...) -> (boolean)]] [flags pure cp02 safeongoodargs])  ; not restricted to 2+ arguments
   (fxabs [sig [(fixnum) -> (fixnum)]] [flags arith-op cp02])

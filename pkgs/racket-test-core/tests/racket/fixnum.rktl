@@ -28,9 +28,9 @@
     (unless (fixnum? x) (raise-argument-error 'wraparound "fixnum?" x))
     (unless (fixnum? y) (raise-argument-error 'wraparound "fixnum?" y))
     (define v (op x y))
-    (if (zero? (bitwise-and v (add1 (greatext-fixnum))))
-        (bitwise-ior v (- -1 (greatest-fixnum)))
-        (bitwise-and v (greatest-fixnum)))))
+    (if (zero? (bitwise-and v (add1 (greatest-fixnum))))
+        (bitwise-and v (greatest-fixnum))
+        (bitwise-ior v (least-fixnum)))))
 
 (define (lshift x y)
   (unless (<= 0 y (integer-length (greatest-fixnum)))

@@ -32,6 +32,19 @@
         (bitwise-and v (greatest-fixnum))
         (bitwise-ior v (least-fixnum)))))
 
+; Check some special cases of the wraparound versions
+(let ()
+  (define fxw+ (wraparound +))
+  (define fxw- (wraparound -))
+  (define fxw* (wraparound *))
+  (test 0 fxw+ (least-fixnum) (least-fixnum))
+  (test -2 fxw+ (greatest-fixnum) (greatest-fixnum))
+  (test 1 fxw- (least-fixnum) (greatest-fixnum))
+  (test -1 fxw- (greatest-fixnum) (least-fixnum))
+  (test 0 fxw* (least-fixnum) (least-fixnum))
+  (test (least-fixnum) fxw* (least-fixnum) (greatest-fixnum))
+  (test 1 fxw* (greatest-fixnum) (greatest-fixnum)))
+
 (define (lshift x y)
   (unless (<= 0 y (integer-length (greatest-fixnum)))
     (error 'lshift "bad shift"))

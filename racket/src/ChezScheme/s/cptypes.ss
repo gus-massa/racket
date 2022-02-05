@@ -980,6 +980,118 @@ Notes:
         (define-specialize/fxfl 2 max fxmax flmax #f)
       )
 
+      (let ()
+        (define (build-let var* e* body)
+          (if (null? var*)
+              body
+              `(call ,(make-preinfo-call) ,(build-lambda var* body) ,e* ...)))
+
+        (define build-lambda
+          (case-lambda
+            [(ids body) (build-lambda (make-preinfo-lambda) ids body)]
+            [(preinfo ids body) `(case-lambda ,preinfo (clause (,ids ...) ,(length ids) ,body))]))
+
+        (define (make-temp multiply-referenced?) ; returns an unassigned temporary
+          (let ([t (make-prelex*)])
+            (when multiply-referenced? (set-prelex-multiply-referenced! t #t))
+            (set-prelex-referenced! t #t)
+            t))
+
+        (define (build-ref x)
+          `(ref #f ,x))
+
+        (define (try-ref->prelex v)
+          (and (Lsrc? v)
+               (nanopass-case (Lsrc Expr) v
+                 [(ref ,maybe-src ,x) x]
+                 [else #f])))
+
+        (define (prepare-let e* r*) ; ==> (before* var* e* ref*)
+          ; All the arguments must have the same length.
+          ; In the results:
+          ;   before*, var* and e* may be shorter than the arguments.
+          ;   var* and e* have the same length.
+          ;   ref* has the same lenght than the arguments.
+          ;        It may be a mix of: references to the new variables
+          ;                            references to variables in the context
+          ;                            propagated constants
+          (let loop ([rev-rbefore* '()] [rev-rvar* '()] [rev-re* '()] [rev-rref* '()]
+                     [e* e*] [r* r*])
+            (cond
+              [(null? e*)
+               (values (reverse rev-rbefore*) (reverse rev-rvar*) (reverse rev-re*) (reverse rev-rref*))]
+              [(check-constant-is? (car r*) (lambda (x) #t))
+               (loop (cons (car e*) rev-rbefore*) rev-rvar* rev-re* (cons (car r*) rev-rref*)
+                     (cdr e*) (cdr r*))]
+              [(try-ref->prelex (car e*))
+               => (lambda (v)
+                    (set-prelex-multiply-referenced! v #t) ; just in case it was sinlge referenced
+                    (loop rev-rbefore* rev-rvar* rev-re* (cons (car e*) rev-rref*)
+                          (cdr e*) (cdr r*)))]
+              [else
+               (let ([v (make-temp #t)])
+                 (loop rev-rbefore* (cons v rev-rvar*) (cons (car e*) rev-re*) (cons (build-ref v) rev-rref*)
+                       (cdr e*) (cdr r*)))])))
+
+        (define-syntax define-specialize/bitwise
+          (syntax-rules ()
+            [(_ lev prim fxprim retfnexpr)
+             (define-specialize lev prim
+               ; Arity is checked before calling this handle.
+               [e* (let ([retfn retfnexpr]
+                         [r* (get-type e*)])
+                     (cond
+                       [(ormap (lambda (r) (predicate-disjoint? r 'fixnum)) r*)
+                        ; some of the arguments can be bignums
+                        (values `(call ,preinfo ,pr ,e* (... ...))
+                                (retfn r*) ntypes #f #f)]
+                       [(andmap (lambda (r) (predicate-implies? r 'fixnum)) r*)
+                        (let ([fxpr (lookup-primref 3 'fxprim)])
+                          (values `(call ,preinfo ,fxpr ,e* (... ...))
+                                  'fixnum ntypes #f #f))]
+                       [else
+                        (let ([fxpr (lookup-primref 3 'fxprim)]
+                              [fixnum?-pr (lookup-primref 2 'fixnum?)])
+                          (let-values ([(before* var* e* ref*) (prepare-let e* r*)])
+                            (let ([test (let loop ([r* (reverse r*)] [ref* (reverse ref*)] [expr #f])
+                                          (cond
+                                            [(null? r*)
+                                             expr]
+                                            [(predicate-implies? (car r*) 'fixnum)
+                                             (loop (cdr r*) (cdr ref*) expr)]
+                                            [(not expr)
+                                             (loop (cdr r*) (cdr ref*) `(call ,(make-preinfo-call) ,fixnum?-pr ,(car ref*)))]
+                                            [else
+                                             (loop (cdr r*) (cdr ref*) `(if (call ,(make-preinfo-call) ,fixnum?-pr ,(car ref*))
+                                                                           ,expr
+                                                                           ,false-rec))]))])
+                              (values (make-seq ctxt (make-1seq* 'effect before*)
+                                                     (build-let var* e*
+                                                                `(if ,test
+                                                                     (call ,(make-preinfo-call) ,fxpr ,ref* (... ...))
+                                                                     (call ,preinfo ,pr ,ref* (... ...)))))
+                                  (retfn r*) ntypes #f #f))))]))])]))
+
+        (define-specialize/bitwise 2 bitwise-and
+                                     fxand
+                                     (lambda (r*) (if (ormap (lambda (r) (check-constant-is? r (lambda (x) (target-fixnum? x)
+                                                                                                           (>= x 0))))
+                                                             r*)
+                                                      'fixnum 'exact-integer)))
+        (define-specialize/bitwise 2 bitwise-ior
+                                     fxior
+                                     (lambda (r*) (if (ormap (lambda (r) (check-constant-is? r (lambda (x) (target-fixnum? x)
+                                                                                                           (< x 0))))
+                                                             r*)
+                                                      'fixnum 'exact-integer)))
+        (define-specialize/bitwise 2 bitwise-xor fxxor (lambda (r*) 'exact-integer))
+        (define-specialize/bitwise 2 bitwise-not fxnot (lambda (r*) 'exact-integer))
+      )
+  ;(test-use-unsafe-fxbinary 'bitwise-and 'unsafe-fxand)
+  ;(test-use-unsafe-fxbinary 'bitwise-ior 'unsafe-fxior)
+  ;(test-use-unsafe-fxbinary 'bitwise-xor 'unsafe-fxxor)
+  ;(test-use-unsafe-fxunary 'bitwise-not 'unsafe-fxnot)
+
       (define-specialize 2 list
         [() (values null-rec null-rec ntypes #f #f)] ; should have been reduced by cp0
         [e* (values `(call ,preinfo ,pr ,e* ...) 'pair ntypes #f #f)])

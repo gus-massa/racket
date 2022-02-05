@@ -1399,6 +1399,39 @@
     '(lambda (x) (unless (fixnum? x) (when (real? x) x))))
 )
 
+(mat bitwise
+  (cptypes-equivalent-expansion?
+    '(lambda (x) (when (fixnum? x) (bitwise-and x 7)))
+    '(lambda (x) (when (fixnum? x) (fxand x 7))))
+  (cptypes-equivalent-expansion?
+    '(lambda (x) (when (fixnum? x) (bitwise-ior x 7)))
+    '(lambda (x) (when (fixnum? x) (fxior x 7))))
+  (cptypes-equivalent-expansion?
+    '(lambda (x) (when (fixnum? x) (bitwise-xor x 7)))
+    '(lambda (x) (when (fixnum? x) (fxxor x 7))))
+  (cptypes-equivalent-expansion?
+    '(lambda (x) (when (fixnum? x) (bitwise-not x)))
+    '(lambda (x) (when (fixnum? x) (fxnot x))))
+  (cptypes-equivalent-expansion?
+    '(lambda (x) (fixnum? (bitwise-and x 7)))
+    '(lambda (x) (bitwise-and x 7) #t))
+  (not (cptypes-equivalent-expansion?
+         '(lambda (x) (fixnum? (bitwise-and x -7)))
+         '(lambda (x) (bitwise-and x -7) #t)))
+  (cptypes-equivalent-expansion?
+    '(lambda (x) (fixnum? (bitwise-ior x -7)))
+    '(lambda (x) (bitwise-ior x -7) #t))
+  (not (cptypes-equivalent-expansion?
+         '(lambda (x) (fixnum? (bitwise-ior x 7)))
+         '(lambda (x) (bitwise-ior x 7) #t)))
+  (cptypes-equivalent-expansion?
+    '(lambda (f g) (bitwise-and (f) (g)))
+    '(lambda (x) (let ([x (f)] [y (g)])
+                    (if (and (fixnum? x) (fixnum? y))
+                        (fxand x y)
+                        (bitwise-and x y)))))
+)
+
 (mat cptypes-unreachable
   (cptypes-equivalent-expansion?
    '(lambda (x) (if (pair? x) (car x) (#3%assert-unreachable)))

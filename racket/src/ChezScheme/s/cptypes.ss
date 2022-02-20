@@ -1319,25 +1319,25 @@ Notes:
                (cond
                  [(predicate-implies? r char-pred)
                   (values ir maybe-symbol-pred ntypes #f #f)]
-                 [(predicate-implies? r 'symbol)
+                 [(predicate-implies? r symbol-pred)
                   (values ir maybe-char-pred ntypes #f #f)]
                  [(and (predicate-disjoint? r char-pred)
-                       (predicate-disjoint? r 'symbol))
+                       (predicate-disjoint? r symbol-pred))
                   (values ir 'bottom pred-env-bottom #f #f)]
                  [else
-                  (values ir (predicate-union maybe-char-pred 'symbol)
-                          (pred-env-add/ref ntypes n (predicate-union char-pred 'symbol) plxc) #f #f)]))]
+                  (values ir (predicate-union maybe-char-pred symbol-pred)
+                          (pred-env-add/ref ntypes n (predicate-union char-pred symbol-pred) plxc) #f #f)]))]
         [(n c) (let ([rn (get-type n)]
                      [rc (get-type c)]
                      [ir `(call ,preinfo ,pr ,n ,c)])
                  (cond
-                   [(or (predicate-disjoint? rn 'symbol)
+                   [(or (predicate-disjoint? rn symbol-pred)
                         (predicate-disjoint? rc maybe-char-pred))
                     (values ir 'bottom pred-env-bottom #f #f)]
                    [else
                     (values ir void-rec
                             (pred-env-add/ref (pred-env-add/ref ntypes
-                                                                n 'symbol plxc)
+                                                                n symbol-pred plxc)
                                               c maybe-char-pred plxc)
                              #f #f)]))])
 

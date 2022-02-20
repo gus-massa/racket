@@ -33,9 +33,16 @@
    char-pred
    eof/char-pred
    maybe-char-pred
+   symbol-pred
    maybe-symbol-pred
+   flonum-pred
    real-pred
    number-pred
+   exact-pred
+   inexact-pred
+   integer-pred
+   flinteger-pred
+   flzero-pred
    $fixmediate-pred
    $list-pred ; immutable lists
    boolean-pred
@@ -56,13 +63,18 @@
    make-pred-$record/ref)
 
   (define-record-type pred-or
-    (fields imm nor exi rec)
-    (nongenerative #{pred-or nlomo7xtc1nguv2umpzwho0dt-1})
+    (fields imm num nor exi rec)
+    (nongenerative #{pred-or nlomo7xtc1nguv2umpzwho0dt-2})
     (sealed #t))
 
   (define-record-type pred-immediate
     (fields mask)
     (nongenerative #{pred-immediate m4e7t2fuam2my9kt17zpmxnzc-1})
+    (sealed #t))
+
+  (define-record-type pred-number*
+    (fields mask)
+    (nongenerative #{pred-number* c2w1h2t2wzoyn0sq8jicb77lw-0})
     (sealed #t))
 
   (define-record-type pred-$record/rtd
@@ -89,9 +101,10 @@
 
   (module (immediate-rec->mask
            build-pred-immediate
-           immediate-pred-mask
-           immediate-pred true-immediate-pred boolean-pred
-           char-pred maybe-char-pred eof/char-pred)
+           all-immediate*-pred-mask
+           all-immediate*-pred true-all-immediate*-pred
+           immediate*-pred true-immediate*-pred
+           boolean-pred)
 
     (define false-object-mask               #b0000000001)
     (define true-object-mask                #b0000000010)
@@ -102,21 +115,19 @@
     (define black-hole-object-mask          #b0001000000)
     (define unbound-object-mask             #b0010000000)
 
-    (define char-pred-mask                  #b0100000000)
-    (define immediate-pred-mask             #b0111111111)
+    (define immediate*-pred-mask            #b0011111111)
+    (define all-immediate*-pred-mask        #b0011111111) ; for the check in is-ptr?
 
     (define boolean-pred-mask (fxior true-object-mask false-object-mask))
-    (define maybe-char-pred-mask (fxior char-pred-mask false-object-mask))
-    (define eof/char-pred-mask (fxior char-pred-mask eof-object-mask))
-    (define true-immediate-pred-mask (fxand immediate-pred-mask (fxnot false-object-mask)))
+    (define true-immediate*-pred-mask (fxand immediate*-pred-mask (fxnot false-object-mask)))
+    (define true-all-immediate*-pred-mask (fxand all-immediate*-pred-mask (fxnot false-object-mask)))
 
-    (define (immediate-rec->mask x extend)
+    (define (immediate-rec->mask x)
       (cond
         [(Lsrc? x)
          (nanopass-case (Lsrc Expr) x
            [(quote ,d)
             (cond
-              [(char? d) (if (not extend) 0 char-pred-mask)]
               [(not d) false-object-mask]
               [(eq? d #t) true-object-mask]
               [(null? d) null-object-mask]
@@ -125,13 +136,12 @@
               [(bwp-object? d) bwp-object-mask]
               [(eq? d ($black-hole)) black-hole-object-mask]
               [($unbound-object? d) unbound-object-mask]
-              [else ($oops 'immediate-rec->mask "invalid immediate ~s" d)])]
+              [else ($oops 'immediate-rec->mask "invalid value ~s" d)])]
            [else ($oops 'immediate-rec->mask "invalid expression ~s" x)])]
         [else ($oops 'immediate-rec->mask "invalid expression ~s" x)]))
 
     (define (mask->immediate-rec y)
       (cond
-        [(fx= y char-pred-mask) char-pred]
         [(fx= y false-object-mask) false-rec]
         [(fx= y true-object-mask) true-rec]
         [(fx= y null-object-mask) null-rec]
@@ -140,7 +150,7 @@
         [(fx= y bwp-object-mask) bwp-rec]
         [(fx= y black-hole-object-mask) black-hole-rec]
         [(fx= y unbound-object-mask) unbound-rec]
-        [else ($oops 'mask->immediate-rec "invalid mask number* ~s" y)]))
+        [else ($oops 'mask->immediate-rec "invalid mask number ~s" y)]))
 
     (define (build-pred-immediate mask x y)
       (cond
@@ -152,35 +162,115 @@
            [(1) (mask->immediate-rec mask)]
            [else (make-pred-immediate mask)])]))
 
-    (define maybe-char-pred (make-pred-immediate maybe-char-pred-mask))
-    (define eof/char-pred (make-pred-immediate eof/char-pred-mask))
-    (define char-pred (make-pred-immediate char-pred-mask))
     (define boolean-pred (make-pred-immediate boolean-pred-mask))
-    (define immediate-pred (make-pred-immediate immediate-pred-mask))
-    (define true-immediate-pred (make-pred-immediate true-immediate-pred-mask))
+    (define immediate*-pred (make-pred-immediate immediate*-pred-mask))
+    (define true-immediate*-pred (make-pred-immediate true-immediate*-pred-mask))
+    (define all-immediate*-pred (make-pred-immediate immediate*-pred-mask))
+    (define true-all-immediate*-pred (make-pred-immediate true-immediate*-pred-mask))
   )
 
-  (define true-pred (make-pred-or true-immediate-pred 'normalptr 'exact-integer '$record))
-  (define ptr-pred (make-pred-or immediate-pred 'normalptr 'exact-integer '$record))
-  (define null-or-pair-pred (make-pred-or null-rec 'pair 'bottom 'bottom))
-  (define $list-pred (make-pred-or null-rec '$list-pair 'bottom 'bottom))
-  (define $fixmediate-pred (make-pred-or immediate-pred 'bottom 'fixnum 'bottom))
-  (define maybe-fixnum-pred (make-pred-or false-rec 'bottom 'fixnum 'bottom))
-  (define eof/fixnum-pred (make-pred-or eof-rec 'bottom 'fixnum 'bottom))
-  (define maybe-exact-integer-pred (make-pred-or false-rec 'bottom 'exact-integer 'bottom))
-  (define maybe-flonum-pred (make-pred-or false-rec 'flonum 'bottom 'bottom))
-  (define real-pred (make-pred-or 'bottom 'real* 'exact-integer 'bottom))
-  (define number-pred (make-pred-or 'bottom 'number* 'exact-integer 'bottom))
-  (define maybe-number-pred (make-pred-or false-rec 'number* 'exact-integer 'bottom))
-  (define maybe-symbol-pred (make-pred-or false-rec 'symbol 'bottom 'bottom))
-  (define maybe-procedure-pred (make-pred-or false-rec 'procedure 'bottom 'bottom))
-  (define maybe-string-pred (make-pred-or false-rec 'string 'bottom 'bottom))
-  (define eof/string-pred (make-pred-or eof-rec 'string 'bottom 'bottom))
-  (define maybe-bytevector-pred (make-pred-or false-rec 'bytevector 'bottom 'bottom))
-  (define eof/bytevector-pred (make-pred-or eof-rec 'bytevector 'bottom 'bottom))
-  (define maybe-pair-pred (make-pred-or false-rec 'pair 'bottom 'bottom))
-  (define maybe-normalptr-pred (make-pred-or false-rec 'normalptr 'bottom 'bottom))
-  (define maybe-$record-pred (make-pred-or false-rec 'bottom 'bottom '$record))
+  (module (number*-rec->mask
+           build-pred-number*
+           all-number*-pred-mask all-number*-pred
+           number*-pred real*-pred ratnum-pred
+           flonum-pred flinteger-pred flzero-pred
+           exact*-pred inexact-pred
+           char-pred
+           symbol-pred interned-symbol-pred uninterned-symbol-pred gensym-pred)
+
+    (define exact-complex-mask               #b0000000001)
+    (define ratnum-mask                      #b0000000010)
+    (define inexact-complex-mask             #b0000000100)
+    (define flonum*-mask                     #b0000001000)
+    (define flinteger*-mask                  #b0000010000)
+    (define flzero-mask                      #b0000100000)
+    ; fixnum and bignum are in other field
+
+    (define char-mask                        #b0001000000)
+    (define interned-symbol-mask             #b0010000000)
+    (define uninterned-symbol-mask           #b0100000000)
+    (define gensym-mask                      #b1000000000)
+
+    (define number*-pred-mask                #b0000111111)
+    (define symbol-pred-mask                 #b1110000000)
+    (define all-number*-pred-mask            #b1111111111) ; for the check in is-ptr?
+
+    (define flonum-pred-mask (fxior flonum*-mask flinteger*-mask flzero-mask))
+    (define flinteger-pred-mask (fxior flinteger*-mask flzero-mask))
+    (define real*-pred-mask (fxior ratnum-mask flonum-pred-mask))
+    (define exact*-pred-mask (fxior ratnum-mask exact-complex-mask))
+    (define inexact-pred-mask (fxior flonum-pred-mask inexact-complex-mask))
+
+    (define (number*-rec->mask x)
+      (cond
+        [(Lsrc? x)
+         (nanopass-case (Lsrc Expr) x
+           [(quote ,d)
+            (cond
+              [(char? d) char-mask]
+              [($exactnum? d) exact-complex-mask]
+              [(ratnum? d) ratnum-mask]
+              [($inexactnum? d) inexact-complex-mask]
+              [(gensym? d) gensym-mask]
+              [(uninterned-symbol? d) uninterned-symbol-mask]
+              [(interned-symbol? d) interned-symbol-mask]
+              [(flzero? d) flzero-mask]
+              [(flinteger? d) flinteger*-mask]
+              [(flonum? d) flonum*-mask]
+              [else ($oops 'number*-rec->mask "invalid value ~s" d)])]
+           [else ($oops 'number*-rec->mask "invalid expression ~s" x)])]
+        [else ($oops 'number*-rec->mask "invalid expression ~s" x)]))
+
+    (define (build-pred-number* mask x y)
+      (cond
+        [(and x (fx= (pred-number*-mask x) mask)) x]
+        [(and y (fx= (pred-number*-mask y) mask)) y]
+        [(fx= mask 0) 'bottom]
+        [else (make-pred-number* mask)]))
+
+    (define number*-pred (make-pred-number* number*-pred-mask))
+    (define real*-pred (make-pred-number* real*-pred-mask))
+    (define ratnum-pred (make-pred-number* ratnum-mask))
+    (define flonum-pred (make-pred-number* flonum-pred-mask))
+    (define flinteger-pred (make-pred-number* flinteger-pred-mask))
+    (define flzero-pred (make-pred-number* flzero-mask))
+    (define exact*-pred (make-pred-number* exact*-pred-mask))
+    (define inexact-pred (make-pred-number* inexact-pred-mask))
+    (define char-pred (make-pred-number* char-mask))
+    (define symbol-pred (make-pred-number* symbol-pred-mask))
+    (define interned-symbol-pred (make-pred-number* interned-symbol-mask))
+    (define uninterned-symbol-pred (make-pred-number* uninterned-symbol-mask))
+    (define gensym-pred (make-pred-number* gensym-mask))
+    (define all-number*-pred (make-pred-number* all-number*-pred-mask))
+  )
+
+  (define immediate-pred (make-pred-or immediate*-pred char-pred 'bottom 'bottom 'bottom))
+  (define true-immediate-pred (make-pred-or true-immediate*-pred char-pred 'bottom 'bottom 'bottom))
+  (define true-pred (make-pred-or true-all-immediate*-pred all-number*-pred 'normalptr 'exact-integer '$record))
+  (define ptr-pred (make-pred-or all-immediate*-pred all-number*-pred 'normalptr 'exact-integer '$record))
+  (define null-or-pair-pred (make-pred-or null-rec 'bottom 'pair 'bottom 'bottom))
+  (define $list-pred (make-pred-or null-rec 'bottom '$list-pair 'bottom 'bottom))
+  (define $fixmediate-pred (make-pred-or immediate*-pred char-pred 'bottom 'fixnum 'bottom))
+  (define maybe-fixnum-pred (make-pred-or false-rec 'bottom 'bottom 'fixnum 'bottom))
+  (define eof/fixnum-pred (make-pred-or eof-rec 'bottom 'bottom 'fixnum 'bottom))
+  (define maybe-exact-integer-pred (make-pred-or false-rec 'bottom 'bottom 'exact-integer 'bottom))
+  (define maybe-flonum-pred (make-pred-or false-rec flonum-pred 'bottom 'bottom 'bottom))
+  (define integer-pred (make-pred-or 'bottom flinteger-pred 'bottom 'exact-integer 'bottom))
+  (define exact-pred (make-pred-or 'bottom exact*-pred 'bottom 'exact-integer 'bottom))
+  (define real-pred (make-pred-or 'bottom real*-pred 'bottom 'exact-integer 'bottom))
+  (define number-pred (make-pred-or 'bottom number*-pred 'bottom 'exact-integer 'bottom))
+  (define maybe-number-pred (make-pred-or false-rec number*-pred 'bottom 'exact-integer 'bottom))
+  (define maybe-symbol-pred (make-pred-or false-rec symbol-pred 'bottom 'bottom 'bottom))
+  (define maybe-procedure-pred (make-pred-or false-rec 'bottom 'procedure 'bottom 'bottom))
+  (define maybe-string-pred (make-pred-or false-rec 'bottom 'string 'bottom 'bottom))
+  (define eof/string-pred (make-pred-or eof-rec 'bottom 'string 'bottom 'bottom))
+  (define maybe-bytevector-pred (make-pred-or false-rec 'bottom 'bytevector 'bottom 'bottom))
+  (define eof/bytevector-pred (make-pred-or eof-rec 'bottom 'bytevector 'bottom 'bottom))
+  (define maybe-pair-pred (make-pred-or false-rec 'bottom 'pair 'bottom 'bottom))
+  (define maybe-symbol/string-pred (make-pred-or false-rec symbol-pred 'string 'bottom 'bottom))
+  (define maybe-$record-pred (make-pred-or false-rec 'bottom 'bottom 'bottom '$record))
+  (define maybe-char-pred (make-pred-or false-rec char-pred 'bottom 'bottom 'bottom))
+  (define eof/char-pred (make-pred-or eof-rec char-pred 'bottom 'bottom 'bottom))
 
   ; This can be implemented with implies?
   ; but let's use the straightforward test.
@@ -188,8 +278,12 @@
     (and (pred-or? x)
          (let ([i (pred-or-imm x)])
            (and (pred-immediate? i)
-                (fx= (pred-immediate-mask i) immediate-pred-mask)))
+                (fx= (pred-immediate-mask i) all-immediate*-pred-mask)))
+         (let ([u (pred-or-num x)])
+           (and (pred-number*? u)
+                (fx= (pred-number*-mask u) all-number*-pred-mask)))
          (eq? (pred-or-nor x) 'normalptr)
+         (eq? (pred-or-exi x) 'exact-integer)
          (eq? (pred-or-rec x) '$record)))
 
   ; don't use rtd-* as defined in record.ss in case we're building a patch
@@ -320,14 +414,14 @@
       [maybe-pathname maybe-string-pred]
       [procedure 'procedure]
       [maybe-procedure maybe-procedure-pred]
-      [maybe-who (cons maybe-symbol-pred maybe-normalptr-pred)] ;should be maybe-string/symbol
+      [maybe-who maybe-symbol/string-pred]
 
-      [gensym 'gensym]
-      [uninterned-symbol 'uninterned-symbol]
-      [interned-symbol 'interned-symbol]
-      [symbol 'symbol]
+      [gensym gensym-pred]
+      [uninterned-symbol uninterned-symbol-pred]
+      [interned-symbol interned-symbol-pred]
+      [symbol symbol-pred]
       [maybe-symbol maybe-symbol-pred]
-      [sub-symbol '(bottom . symbol)]
+      [sub-symbol (cons 'bottom symbol-pred)]
       [maybe-sub-symbol (cons false-rec maybe-symbol-pred)]
 
       [fixnum 'fixnum]
@@ -339,13 +433,16 @@
       [(exact-integer sint) 'exact-integer]
       [(uint sub-uint nzuint exact-uinteger sub-sint) '(bottom . exact-integer)]
       [maybe-uint (cons false-rec maybe-exact-integer-pred)]
-      [flonum 'flonum]
-      [sub-flonum '(bottom . flonum)]
+      [ratnum ratnum-pred]
+      [flonum flonum-pred]
+      [sub-flonum (cons 'bottom flonum-pred)]
       [maybe-flonum maybe-flonum-pred]
       [real real-pred]
-      [(integer rational) (cons 'exact-integer real-pred)]
-      [(uinteger sub-integer) (cons 'bottom real-pred)]
-      [cflonum '(flonum . number*)] ; only inexact numbers
+      [rational (cons 'exact-integer real-pred)]
+      [integer integer-pred]
+      [(uinteger sub-integer) (cons 'bottom integer-pred)]
+      [(cflonum inexact-number) inexact-pred]
+      [exact-number exact-pred]
       [number number-pred]
       [sub-number (cons 'bottom number-pred)]
       [maybe-number maybe-number-pred]
@@ -393,7 +490,7 @@
       [(eq? x 'bottom) y]
       [(eq? y 'bottom) x]
       [(Lsrc? x)
-       (let ([mx (immediate-rec->mask x #t)])
+       (let ([mx (immediate-rec->mask x)])
          (cond
            [(Lsrc? y)
             (cond
@@ -401,7 +498,7 @@
                      (constant-value y))
                y]
               [else
-               (let ([my (immediate-rec->mask y #t)])
+               (let ([my (immediate-rec->mask y)])
                  (build-pred-immediate (fxior mx my) #f #f))])]
            [(pred-immediate? y)
             (let ([my (pred-immediate-mask y)])
@@ -412,7 +509,7 @@
        (let ([mx (pred-immediate-mask x)])
          (cond
            [(Lsrc? y)
-            (let ([my (immediate-rec->mask y #t)])
+            (let ([my (immediate-rec->mask y)])
               (build-pred-immediate (fxior mx my) x #f))]
            [(pred-immediate? y)
             (let ([my (pred-immediate-mask y)])
@@ -422,6 +519,41 @@
       [else
        ($oops 'predicate-union/immediate "invalid expression ~s" x)]))
 
+  (define (predicate-union/number* x y)
+    (cond
+      [(eq? x y) y]
+      [(eq? x 'bottom) y]
+      [(eq? y 'bottom) x]
+      [(Lsrc? x)
+       (let ([mx (number*-rec->mask x)])
+         (cond
+           [(Lsrc? y)
+            (cond
+              [(eqv? (constant-value x)
+                     (constant-value y))
+               y]
+              [else
+               (let ([my (number*-rec->mask y)])
+                 (build-pred-number* (fxior mx my) #f #f))])]
+           [(pred-number*? y)
+            (let ([my (pred-number*-mask y)])
+              (build-pred-number* (fxior mx my) y #f))]
+           [else 
+            ($oops 'predicate-union/number* "invalid expression ~s" y)]))]
+      [(pred-number*? x)
+       (let ([mx (pred-number*-mask x)])
+         (cond
+           [(Lsrc? y)
+            (let ([my (number*-rec->mask y)])
+              (build-pred-number* (fxior mx my) x #f))]
+           [(pred-number*? y)
+            (let ([my (pred-number*-mask y)])
+              (build-pred-number* (fxior mx my) y x))]
+           [else
+            ($oops 'predicate-union/number* "invalid expression ~s" y)]))]
+      [else
+       ($oops 'predicate-union/number* "invalid expression ~s" x)]))
+
   (define (union/simple x pred? y)
     (cond
       [(or (check-constant-is? x pred?)
@@ -429,56 +561,6 @@
        y]
       [else
        'normalptr]))
-
-  (define (union/symbol x pred? y)
-     (cond
-       [(or (check-constant-is? x pred?)
-            (eq? x y))
-        y]
-       [(or (eq? x 'gensym)
-		    (eq? x 'interned-symbol)
-		    (eq? x 'uninterned-symbol)
-	    	(eq? x 'symbol)
-		    (check-constant-is? x symbol?))
-		'symbol]
-       [else
-        'normalptr]))
-
-  (define (union/flonum x)
-    (cond 
- 	  [(or (eq? x 'flonum)
-		   (check-constant-is? x flonum?))
-	   'flonum]
-	  [(or (eq? x 'real*)
-		   (check-constant-is? x real?))
-	   'real*]
-	  [(or (eq? x 'number*)
-		   (check-constant-is? x number?))
-	   'number*]
-	  [else
-	   'normalptr]))
-
-  (define (union/real x)
-    (cond 
-	  [(or (eq? x 'flonum)
-		   (eq? x 'real*)
-		   (check-constant-is? x real?))
-	   'real*]
-	  [(or (eq? x 'number*)
-		   (check-constant-is? x number?))
-	   'number*]
-	  [else
-	   'normalptr]))
-
-  (define (union/number x)
-	(cond 
-	  [(or (eq? x 'flonum)
-		   (eq? x 'real*)
-		   (eq? x 'number*)
-		   (check-constant-is? x number?))
-	   'number*]
-	  [else
-	   'normalptr]))
 
   (define (predicate-union/normal x y)
     (cond
@@ -494,15 +576,13 @@
           (cond
             [(check-constant-eqv? x dy)
              y]
-		  	[(flonum? dy)
-  			 (union/flonum x)]
-			[(real? dy)
-  			 (union/real x)]
-			[(number? dy)
-  			 (union/number x)]
-            [(gensym? dy) (union/symbol x gensym? 'gensym)]
-            [(uninterned-symbol? dy) (union/symbol x uninterned-symbol? 'uninterned-symbol)]
-            [(interned-symbol? dy) (union/symbol x interned-symbol? 'interned-symbol)]
+            [(or (number? dy) (char? dy) (symbol? dy))
+             (if (or (check-constant-is? x number?)
+                     (check-constant-is? x char?)
+                     (check-constant-is? x symbol?)
+                     (pred-number*? x))
+                 (predicate-union/number* x y)
+                 'normalptr)]
             [(vector? dy) (union/simple x vector? 'vector)]; i.e. #()
             [(string? dy) (union/simple x string? 'string)]; i.e. ""
             [(bytevector? dy) (union/simple x bytevector? 'bytevector)] ; i.e. '#vu8()
@@ -510,22 +590,15 @@
             [(flvector? dy) (union/simple x flvector? 'flvector)] ; i.e. '#vfl()
             [else
              'normalptr])])]
+      [(pred-number*? y)
+       (if (or (check-constant-is? x number?)
+               (check-constant-is? x char?)
+               (check-constant-is? x symbol?)
+               (pred-number*? x))
+           (predicate-union/number* x y)
+           'normalptr)]
       [else
        (case y
-		 [(flonum)
-  		  (union/flonum x)]
-		 [(real*)
-  		  (union/real x)]
-		 [(number*)
-  		  (union/number x)]
-         [(gensym)
-          (union/symbol x gensym? 'gensym)]
-         [(uninterned-symbol)
-          (union/symbol x uninterned-symbol? 'uninterned-symbol)]
-         [(interned-symbol)
-          (union/symbol x interned-symbol? 'interned-symbol)]
-         [(symbol)
-          (union/symbol x symbol? 'symbol)]
          [(pair $list-pair)
           (cond 
 	        [(or (eq? x 'pair)
@@ -626,7 +699,7 @@
               x
               'bottom)]
          [(pred-immediate? y)
-          (let ([mx (immediate-rec->mask x #t)]
+          (let ([mx (immediate-rec->mask x)]
                 [my (pred-immediate-mask y)])
             (if (not (fx= (fxand mx my) 0))
                 x
@@ -637,7 +710,7 @@
        (let ([mx (pred-immediate-mask x)])
          (cond
            [(Lsrc? y)
-            (let ([my (immediate-rec->mask y #t)])
+            (let ([my (immediate-rec->mask y)])
               (if (not (fx= (fxand mx my) 0))
                   y
                   'bottom))]
@@ -649,54 +722,46 @@
       [else
        ($oops 'predicate-intersect/immediate "invalid expression ~s" x)]))
 
+  (define (predicate-intersect/number* x y)
+    (cond
+      [(eq? x y) x]
+      [(eq? y 'bottom) 'bottom]
+      [(eq? x 'bottom) 'bottom]
+      [(Lsrc? x)
+       (cond
+         [(Lsrc? y)
+          (if (eqv? (constant-value x) (constant-value y))
+              x
+              'bottom)]
+         [(pred-number*? y)
+          (let ([mx (number*-rec->mask x)]
+                [my (pred-number*-mask y)])
+            (if (not (fx= (fxand mx my) 0))
+                x
+                'bottom))]
+         [else
+          ($oops 'predicate-intersect/number* "invalid expression ~s" y)])]
+      [(pred-number*? x)
+       (let ([mx (pred-number*-mask x)])
+         (cond
+           [(Lsrc? y)
+            (let ([my (number*-rec->mask y)])
+              (if (not (fx= (fxand mx my) 0))
+                  y
+                  'bottom))]
+           [(pred-number*? y)
+            (let ([my (pred-number*-mask y)])
+              (build-pred-number* (fxand mx my) x y))]
+           [else
+            ($oops 'predicate-intersect/number* "invalid expression ~s" y)]))]
+      [else
+       ($oops 'predicate-intersect/number* "invalid expression ~s" x)]))
+
   (define (intersect/simple x pred? qpred y)
      (cond
        [(and pred? (check-constant-is? x pred?))
         x]
        [(eq? x qpred)
-        y]
-       [else
-        'bottom]))
-
-  (define (intersect/symbol x pred? qpred y)
-     (cond
-       [(and pred? (check-constant-is? x pred?))
-        x]
-       [(or (eq? x qpred)
-            (eq? x 'symbol))
-        y]
-       [else
-        'bottom]))
-
-  (define (intersect/flonum x check? y)
-     (cond
-       [(and check? (check-constant-is? x flonum?))
-        x]
-       [(or (eq? x 'flonum)
-            (eq? x 'real*)
-            (eq? x 'number*))
-        y]
-       [else
-        'bottom]))
-
-  (define (intersect/real x check? y)
-     (cond
-       [(and check? (or (check-constant-is? x real?)
-                        (eq? x 'flonum)))
-        x]
-       [(or (eq? x 'real*)
-            (eq? x 'number*))
-        y]
-       [else
-        'bottom]))
-
-  (define (intersect/number x check? y)
-     (cond
-       [(and check? (or (check-constant-is? x number?)
-                        (eq? x 'flonum)
-                        (eq? x 'real*)))
-        x]
-       [(eq? x 'number*)
         y]
        [else
         'bottom]))
@@ -715,15 +780,13 @@
           (cond
             [(check-constant-eqv? x dy)
              x]
-		  	[(flonum? dy)
-  			 (intersect/flonum x #f y)]
-			[(real? dy)
-  			 (intersect/real x #f y)]
-			[(number? dy)
-  			 (intersect/number x #f y)]
-            [(gensym? dy) (intersect/symbol x #f 'gensym y)]
-            [(uninterned-symbol? dy) (intersect/symbol x #f 'uninterned-symbol y)]
-            [(interned-symbol? dy) (intersect/symbol x #f 'interned-symbol y)]
+            [(or (number? dy) (char? dy) (symbol? dy))
+             (if (or (check-constant-is? x number?)
+                     (check-constant-is? x char?)
+                     (check-constant-is? x symbol?)
+                     (pred-number*? x))
+                 (predicate-intersect/number* x y)
+                 'bottom)]
             [(vector? dy) (intersect/simple x #f 'vector y)]; i.e. #()
             [(string? dy) (intersect/simple x #f 'string y)]; i.e. ""
             [(bytevector? dy) (intersect/simple x bytevector? 'bytevector y)] ; i.e. '#vu8()
@@ -731,30 +794,15 @@
             [(flvector? dy) (intersect/simple x #f 'flvector y)] ; i.e. '#vfl()
             [else
              'bottom])])]
+      [(pred-number*? y)
+       (if (or (check-constant-is? x number?)
+               (check-constant-is? x char?)
+               (check-constant-is? x symbol?)
+               (pred-number*? x))
+           (predicate-intersect/number* x y)
+           'bottom)]
       [else
        (case y
-		 [(flonum)
-  		  (intersect/flonum x #t y)]
-		 [(real*)
-  		  (intersect/real x #t y)]
-		 [(number*)
-  		  (intersect/number x #t y)]
-         [(gensym)
-          (intersect/symbol x gensym? 'gensym y)]
-         [(uninterned-symbol)
-          (intersect/symbol x uninterned-symbol? 'uninterned-symbol y)]
-         [(interned-symbol)
-          (intersect/symbol x interned-symbol? 'interned-symbol y)]
-         [(symbol)
-          (cond 
-            [(or (eq? x 'gensym)
-                 (eq? x 'uninterned-symbol)
-                 (eq? x 'interned-symbol)
-                 (eq? x 'symbol)
-                 (check-constant-is? x symbol?))
-             x]
-            [else
-             'bottom])]
          [(pair $list-pair)
           (cond
             [(or (eq? x 'pair)
@@ -866,7 +914,7 @@
               x)]
          [(pred-immediate? y)
           (let ([my (pred-immediate-mask y)]
-                [mx (immediate-rec->mask x #t)])
+                [mx (immediate-rec->mask x)])
             (if (not (fx= (fxand mx my) 0))
                 'bottom
                 x))]
@@ -876,7 +924,7 @@
        (let ([mx (pred-immediate-mask x)])
          (cond
            [(Lsrc? y)
-            (let ([my (immediate-rec->mask y #f)])
+            (let ([my (immediate-rec->mask y)])
               (build-pred-immediate (fxand mx (fxnot my)) x #f))]
            [(pred-immediate? y)
             (let ([my (pred-immediate-mask y)])
@@ -885,6 +933,39 @@
             ($oops 'predicate-substract/immediate "invalid expression ~s" y)]))]
       [else
        ($oops 'predicate-substract/immediate "invalid expression ~s" x)]))
+
+  (define (predicate-substract/number* x y)
+    (cond
+      [(eq? x y) 'bottom]
+      [(eq? y 'bottom) x]
+      [(eq? x 'bottom) 'bottom]
+      [(Lsrc? x)
+       (cond
+         [(Lsrc? y)
+          (if (eqv? (constant-value x)
+                    (constant-value y))
+              'bottom
+              x)]
+         [(pred-number*? y)
+          (let ([my (pred-number*-mask y)]
+                [mx (number*-rec->mask x)])
+            (if (not (fx= (fxand mx my) 0))
+                'bottom
+                x))]
+         [else
+          ($oops 'predicate-substract/number* "invalid expression ~s" y)])]
+      [(pred-number*? x)
+       (let ([mx (pred-number*-mask x)])
+         (cond
+           [(Lsrc? y)
+            x]
+           [(pred-number*? y)
+            (let ([my (pred-number*-mask y)])
+              (build-pred-number* (fxand mx (fxnot my)) x #f))]
+           [else
+            ($oops 'predicate-substract/number* "invalid expression ~s" y)]))]
+      [else
+       ($oops 'predicate-substract/number* "invalid expression ~s" x)]))
 
   (define (predicate-substract/normal x y)
     (if (predicate-implies?/normal x y)
@@ -944,12 +1025,18 @@
   (define (predicate->class x)
     (cond
       #;[(eq? x 'bottom) 'bottom]
+      [(check-constant-is? x char?)
+       'number*]
       [(or (check-constant-is? x $immediate?)
            (pred-immediate? x))
        'immediate]
       [(or (check-constant-is? x exact-integer?)
            (memq x '(fixnum bignum exact-integer)))
        'exact-integer]
+      [(or (check-constant-is? x number?)
+           (check-constant-is? x symbol?)
+           (pred-number*? x))
+       'number*]
       [(or (eq? x '$record)
            (pred-$record/rtd? x)
            (pred-$record/ref? x))
@@ -957,8 +1044,8 @@
       [else
        'normalptr]))
 
-  (define (only-one i n e r)
-    (let loop ([l (list i n e r)]
+  (define (only-one i u n e r)
+    (let loop ([l (list i u n e r)]
                [one 'bottom])
       (cond
         [(null? l)
@@ -972,28 +1059,30 @@
 
   (define build-pred-or
     (case-lambda
-      [(i n e r)
-       (build-pred-or i n e r #f #f)]
-      [(i n e r x)
-       (build-pred-or i n e r x #f)]
-      [(i n e r x y)
+      [(i u n e r)
+       (build-pred-or i u n e r #f #f)]
+      [(i u n e r x)
+       (build-pred-or i u n e r x #f)]
+      [(i u n e r x y)
        (cond
          [(and x
                (eq? (pred-or-imm x) i)
+               (eq? (pred-or-num x) u)
                (eq? (pred-or-nor x) n)
                (eq? (pred-or-exi x) e)
                (eq? (pred-or-rec x) r))
           x]
          [(and y
                (eq? (pred-or-imm y) i)
+               (eq? (pred-or-num y) u)
                (eq? (pred-or-nor y) n)
                (eq? (pred-or-exi y) e)
                (eq? (pred-or-rec y) r))
           y]
-         [(only-one i n e r)
+         [(only-one i u n e r)
           => (lambda (x) x)]
          [else
-          (make-pred-or i n e r)])]))
+          (make-pred-or i u n e r)])]))
   
   ;If x and y are equivalent, they result must be eq? to y
   ;so it's easy to test in predicate-implies?.
@@ -1007,32 +1096,44 @@
             (pred-or? y))
        (let ()
          (define i (predicate-union/immediate (pred-or-imm x) (pred-or-imm y)))
+         (define u (predicate-union/number* (pred-or-num x) (pred-or-num y)))
          (define n (predicate-union/normal (pred-or-nor x) (pred-or-nor y)))
          (define e (predicate-union/exact-integer (pred-or-exi x) (pred-or-exi y)))
          (define r (predicate-union/record (pred-or-rec x) (pred-or-rec y)))
-         (build-pred-or i n e r y x))]
+         (build-pred-or i u n e r y x))]
       [(pred-or? x)
        (case (predicate->class y)
          [(immediate)
           (build-pred-or (predicate-union/immediate (pred-or-imm x) y)
+                         (pred-or-num x)
+                         (pred-or-nor x)
+                         (pred-or-exi x)
+                         (pred-or-rec x)
+                         x)]
+         [(number*)
+          (build-pred-or (pred-or-imm x)
+                         (predicate-union/number* (pred-or-num x) y)
                          (pred-or-nor x)
                          (pred-or-exi x)
                          (pred-or-rec x)
                          x)]
          [(normalptr)
           (build-pred-or (pred-or-imm x)
+                         (pred-or-num x)
                          (predicate-union/normal (pred-or-nor x) y)
                          (pred-or-exi x)
                          (pred-or-rec x)
                          x)]
          [(exact-integer)
           (build-pred-or (pred-or-imm x)
+                         (pred-or-num x)
                          (pred-or-nor x)
                          (predicate-union/exact-integer (pred-or-exi x) y)
                          (pred-or-rec x)
                          x)]
          [($record)
           (build-pred-or (pred-or-imm x)
+                         (pred-or-num x)
                          (pred-or-nor x)
                          (pred-or-exi x)
                          (predicate-union/record (pred-or-rec x) y)
@@ -1041,24 +1142,35 @@
        (case (predicate->class x)
          [(immediate)
           (build-pred-or (predicate-union/immediate x (pred-or-imm y))
+                         (pred-or-num y)
+                         (pred-or-nor y)
+                         (pred-or-exi y)
+                         (pred-or-rec y)
+                         y)]
+         [(number*)
+          (build-pred-or (pred-or-imm y)
+                         (predicate-union/number* x (pred-or-num y))
                          (pred-or-nor y)
                          (pred-or-exi y)
                          (pred-or-rec y)
                          y)]
          [(normalptr)
           (build-pred-or (pred-or-imm y)
+                         (pred-or-num y)
                          (predicate-union/normal x (pred-or-nor y))
                          (pred-or-exi y)
                          (pred-or-rec y)
                          y)]
          [(exact-integer)
           (build-pred-or (pred-or-imm y)
+                         (pred-or-num y)
                          (pred-or-nor y)
                          (predicate-union/exact-integer x (pred-or-exi y))
                          (pred-or-rec y)
                          y)]
          [($record)
           (build-pred-or (pred-or-imm y)
+                         (pred-or-num y)
                          (pred-or-nor y)
                          (pred-or-exi y)
                          (predicate-union/record x (pred-or-rec y))
@@ -1072,6 +1184,8 @@
             (case cx
               [(immediate)
                (predicate-union/immediate x y)]
+              [(number*)
+               (predicate-union/number* x y)]
               [(normalptr)
                (predicate-union/normal x y)]
               [(exact-integer)
@@ -1083,6 +1197,10 @@
               (define i (cond
                           [(eq? cx 'immediate) x]
                           [(eq? cy 'immediate) y]
+                          [else 'bottom]))
+              (define u (cond
+                          [(eq? cx 'number*) x]
+                          [(eq? cy 'number*) y]
                           [else 'bottom]))
               (define n (cond
                           [(eq? cx 'normalptr) x]
@@ -1096,7 +1214,7 @@
                           [(eq? cx '$record) x]
                           [(eq? cy '$record) y]
                           [else 'bottom]))
-              (build-pred-or i n e r))]))]))
+              (build-pred-or i u n e r))]))]))
 
   ;The result may be bigger than the actual intersection 
   ;if there is no exact result, it must be at least included in x
@@ -1113,14 +1231,17 @@
             (pred-or? y))
        (let ()
          (define i (predicate-intersect/immediate (pred-or-imm x) (pred-or-imm y)))
+         (define u (predicate-intersect/number* (pred-or-num x) (pred-or-num y)))
          (define n (predicate-intersect/normal (pred-or-nor x) (pred-or-nor y)))
          (define e (predicate-intersect/exact-integer (pred-or-exi x) (pred-or-exi y)))
          (define r (predicate-intersect/record (pred-or-rec x) (pred-or-rec y)))
-         (build-pred-or i n e r x y))]
+         (build-pred-or i u n e r x y))]
       [(pred-or? x)
        (case (predicate->class y)
          [(immediate)
           (predicate-intersect/immediate (pred-or-imm x) y)]
+         [(number*)
+          (predicate-intersect/number* (pred-or-num x) y)]
          [(normalptr)
           (predicate-intersect/normal (pred-or-nor x) y)]
          [(exact-integer)
@@ -1131,6 +1252,8 @@
        (case (predicate->class x)
          [(immediate)
           (predicate-intersect/immediate x (pred-or-imm y))]
+         [(number*)
+          (predicate-intersect/number* x (pred-or-num y))]
          [(normalptr)
           (predicate-intersect/normal x (pred-or-nor y))]
          [(exact-integer)
@@ -1148,6 +1271,8 @@
             (case cx
               [(immediate)
                (predicate-intersect/immediate x y)]
+              [(number*)
+               (predicate-intersect/number* x y)]
               [(normalptr)
                (predicate-intersect/normal x y)]
               [(exact-integer)
@@ -1171,28 +1296,34 @@
             (pred-or? y))
        (let ()
          (define i (predicate-substract/immediate (pred-or-imm x) (pred-or-imm y)))
+         (define u (predicate-substract/number* (pred-or-num x) (pred-or-num y)))
          (define n (predicate-substract/normal (pred-or-nor x) (pred-or-nor y)))
          (define e (predicate-substract/exact-integer (pred-or-exi x) (pred-or-exi y)))
          (define r (predicate-substract/record (pred-or-rec x) (pred-or-rec y)))
-         (build-pred-or i n e r x))]
+         (build-pred-or i u n e r x))]
       [(pred-or? x)
        (let ([i (pred-or-imm x)]
+             [u (pred-or-num x)]
              [n (pred-or-nor x)]
              [e (pred-or-exi x)]
              [r (pred-or-rec x)])
          (case (predicate->class y)
            [(immediate)
-            (build-pred-or (predicate-substract/immediate i y) n e r x)]
+            (build-pred-or (predicate-substract/immediate i y) u n e r x)]
+           [(number*)
+            (build-pred-or i (predicate-substract/number* u y) n e r x)]
            [(normalptr)
-            (build-pred-or i (predicate-substract/normal n y) e r x)]
+            (build-pred-or i u (predicate-substract/normal n y) e r x)]
            [(exact-integer)
-            (build-pred-or i n (predicate-substract/exact-integer e y) r x)]
+            (build-pred-or i u n (predicate-substract/exact-integer e y) r x)]
            [($record)
-            (build-pred-or i n e (predicate-substract/record r y) x)]))]
+            (build-pred-or i u n e (predicate-substract/record r y) x)]))]
       [(pred-or? y)
        (case (predicate->class x)
          [(immediate)
           (predicate-substract/immediate x (pred-or-imm y))]
+         [(number*)
+          (predicate-substract/number* x (pred-or-num y))]
          [(normalptr)
           (predicate-substract/normal x (pred-or-nor y))]
          [(exact-integer)
@@ -1210,6 +1341,8 @@
             (case cx
               [(immediate)
                (predicate-substract/immediate x y)]
+              [(number*)
+               (predicate-substract/number* x y)]
               [(normalptr)
                (predicate-substract/normal x y)]
               [(exact-integer)

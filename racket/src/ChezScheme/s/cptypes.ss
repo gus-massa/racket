@@ -43,7 +43,7 @@ Notes:
 
 
  - predicate: They may be:
-              * a symbol to indicate the type, like 'vector 'pair 'flonum
+              * a symbol to indicate the type, like 'vector 'pair
                 (there are a few fake values, in particular 'bottom is used to
                  signal that there is an error)
               * a nanopass-quoted value that is okay-to-copy?, like
@@ -628,6 +628,7 @@ Notes:
       [$record? '$record]
       [fixnum? 'fixnum]
       [bignum? 'bignum]
+      [ratnum? 'ratnum]
       [flonum? 'flonum]
       [real? 'real]
       [number? 'number]
@@ -993,10 +994,10 @@ Notes:
                           (values `(call ,preinfo ,pr ,e* (... ...))
                                   (if boolean? boolean-pred 'fixnum)
                                   ntypes #f #f))]
-                       [(andmap (lambda (r) (predicate-implies? r 'flonum)) r*)
+                       [(andmap (lambda (r) (predicate-implies? r flonum-pred)) r*)
                         (let ([pr (lookup-primref 3 'flprim)])
                           (values `(call ,preinfo ,pr ,e* (... ...))
-                                  (if boolean? boolean-pred 'flonum)
+                                  (if boolean? boolean-pred flonum-pred)
                                   ntypes #f #f))]
                        [else
                         (values `(call ,preinfo ,pr ,e* (... ...))
@@ -1181,26 +1182,72 @@ Notes:
       (define-specialize 2 exact?
         [(n) (let ([r (get-type n)])
                (cond
-                 [(predicate-implies? r 'exact-integer)
+                 [(predicate-implies? r exact-pred)
                   (values (make-seq ctxt n true-rec)
                           true-rec ntypes #f #f)]
-                 [(predicate-implies? r 'flonum)
+                 [(predicate-disjoint? r exact-pred)
                   (values (make-seq ctxt n false-rec)
                           false-rec ntypes #f #f)]
                  [else
-                  (values `(call ,preinfo ,pr ,n) ret ntypes #f #f)]))])
+                  (values `(call ,preinfo ,pr ,n)
+                          ret
+                          ntypes
+                          (pred-env-add/ref ntypes n exact-pred plxc)
+                          (pred-env-add/not/ref ntypes n exact-pred plxc))]))])
 
       (define-specialize 2 inexact?
         [(n) (let ([r (get-type n)])
                (cond
-                 [(predicate-implies? r 'exact-integer)
-                  (values (make-seq ctxt n false-rec)
-                          false-rec ntypes #f #f)]
-                 [(predicate-implies? r 'flonum)
+                 [(predicate-implies? r inexact-pred)
                   (values (make-seq ctxt n true-rec)
                           true-rec ntypes #f #f)]
+                 [(predicate-disjoint? r inexact-pred)
+                  (values (make-seq ctxt n false-rec)
+                          false-rec ntypes #f #f)]
                  [else
-                  (values `(call ,preinfo ,pr ,n) ret ntypes #f #f)]))])
+                  (values `(call ,preinfo ,pr ,n)
+                          ret
+                          ntypes
+                          (pred-env-add/ref ntypes n inexact-pred plxc)
+                          (pred-env-add/not/ref ntypes n inexact-pred plxc))]))])
+
+      (define-specialize 2 integer?
+        [(n) (let ([r (get-type n)])
+               (cond
+                 [(predicate-implies? r integer-pred)
+                  (values (make-seq ctxt n true-rec)
+                          true-rec ntypes #f #f)]
+                 [(predicate-disjoint? r integer-pred)
+                  (values (make-seq ctxt n false-rec)
+                          false-rec ntypes #f #f)]
+                 [(predicate-implies? r flonum-pred)
+                  (values `(call ,preinfo ,(lookup-primref 3 'flinteger?) ,n)
+                          ret
+                          ntypes
+                          (pred-env-add/ref ntypes n flinteger-pred plxc)
+                          (pred-env-add/not/ref ntypes n flinteger-pred plxc))]
+                 [else
+                  (values `(call ,preinfo ,pr ,n)
+                          ret
+                          ntypes
+                          (pred-env-add/ref ntypes n integer-pred plxc)
+                          (pred-env-add/not/ref ntypes n integer-pred plxc))]))])
+
+      (define-specialize 2 flinteger?
+        [(n) (let ([r (get-type n)])
+               (cond
+                 [(predicate-implies? r flinteger-pred)
+                  (values (make-seq ctxt n true-rec)
+                          true-rec ntypes #f #f)]
+                 [(predicate-disjoint? r flinteger-pred)
+                  (values (make-seq ctxt n false-rec)
+                          false-rec ntypes #f #f)]
+                 [else
+                  (values `(call ,preinfo ,pr ,n)
+                          ret
+                          ntypes
+                          (pred-env-add/ref ntypes n flinteger-pred plxc)
+                          (pred-env-add/not/ref ntypes n flinteger-pred plxc))]))])
 
       (define-specialize 2 zero?
         [(n) (let ([r (get-type n)])
@@ -1219,13 +1266,13 @@ Notes:
                           ret
                           ntypes
                           (pred-env-add/ref ntypes n `(quote 0) plxc)
-                          #f)]
-                 [(predicate-implies? r 'flonum)
+                          (pred-env-add/not/ref ntypes n `(quote 0) plxc))]
+                 [(predicate-implies? r flonum-pred)
                   (values `(call ,preinfo ,(lookup-primref 3 'flzero?) ,n)
                           ret
                           ntypes
-                          #f ; TODO: Add a type for flzero
-                          #f)]
+                          (pred-env-add/ref ntypes n flzero-pred plxc)
+                          (pred-env-add/ref ntypes n flzero-pred plxc))]
                  [else
                   (values `(call ,preinfo ,pr ,n) ret ntypes #f #f)]))])
 
@@ -1234,7 +1281,14 @@ Notes:
                      ret
                      ntypes
                      (pred-env-add/ref ntypes n `(quote 0) plxc)
-                     #f)])
+                     (pred-env-add/not/ref ntypes n `(quote 0) plxc))])
+
+      (define-specialize 2 flzero?
+        [(n) (values `(call ,preinfo ,pr ,n)
+                     ret
+                     ntypes
+                     (pred-env-add/ref ntypes n flzero-pred plxc)
+                     (pred-env-add/not/ref ntypes n flzero-pred plxc))])
 
       (define-specialize 2 atan
         [(n) (let ([r (get-type n)])

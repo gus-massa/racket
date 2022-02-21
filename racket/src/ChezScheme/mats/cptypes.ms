@@ -1344,7 +1344,7 @@
   (cptypes-equivalent-expansion?
     '(lambda (p) (define x (get-u8 p)) (unless (fixnum? x) (eq? x (eof-object))))
     '(lambda (p) (define x (get-u8 p)) (unless (fixnum? x) #t)))
-  #;(cptypes-equivalent-expansion?
+  (cptypes-equivalent-expansion?
     '(lambda (x) (unless (char? x) (char? x)))
     '(lambda (x) (unless (char? x) #f)))
   (cptypes-equivalent-expansion?

@@ -443,6 +443,8 @@
       [(uinteger sub-integer) (cons 'bottom integer-pred)]
       [(cflonum inexact-number) inexact-pred]
       [exact-number exact-pred]
+      [integer integer-pred]
+      [flinteger flinteger-pred]
       [number number-pred]
       [sub-number (cons 'bottom number-pred)]
       [maybe-number maybe-number-pred]

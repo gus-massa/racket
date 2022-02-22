@@ -96,7 +96,7 @@
   (fl<=? [sig [(flonum flonum flonum ...) -> (boolean)]] [flags pure mifoldable discard safeongoodargs unboxed-arguments]) ; restricted to 2+ arguments
   (fl>? [sig [(flonum flonum flonum ...) -> (boolean)]] [flags pure mifoldable discard safeongoodargs unboxed-arguments])  ; restricted to 2+ arguments
   (fl>=? [sig [(flonum flonum flonum ...) -> (boolean)]] [flags pure mifoldable discard safeongoodargs unboxed-arguments]) ; restricted to 2+ arguments
-  (flinteger? [sig [(flonum) -> (boolean)]] [flags pure mifoldable discard safeongoodargs cptypes2])
+  (flinteger? [sig [(flonum) -> (boolean)]] [flags pure mifoldable discard safeongoodargs])
   (flzero? [sig [(flonum) -> (boolean)]] [flags pure mifoldable discard safeongoodargs cptypes2])
   (flpositive? [sig [(flonum) -> (boolean)]] [flags pure mifoldable discard safeongoodargs])
   (flnegative? [sig [(flonum) -> (boolean)]] [flags pure mifoldable discard safeongoodargs])
@@ -188,12 +188,12 @@
   (complex? [sig [(ptr) -> (boolean)]] [flags pure unrestricted mifoldable discard ieee r5rs])
   (real? [sig [(ptr) -> (boolean)]] [flags pure unrestricted mifoldable discard ieee r5rs])
   (rational? [sig [(ptr) -> (boolean)]] [flags pure unrestricted mifoldable discard ieee r5rs])
-  (integer? [sig [(ptr) -> (boolean)]] [flags pure unrestricted mifoldable discard ieee r5rs cptypes2])
+  (integer? [sig [(ptr) -> (boolean)]] [flags pure unrestricted mifoldable discard ieee r5rs])
   (real-valued? [sig [(ptr) -> (boolean)]] [flags pure unrestricted mifoldable discard])
   (rational-valued? [sig [(ptr) -> (boolean)]] [flags pure unrestricted mifoldable discard])
   (integer-valued? [sig [(ptr) -> (boolean)]] [flags pure unrestricted mifoldable discard])
-  (exact? [sig [(number) -> (boolean)]] [flags pure mifoldable discard safeongoodargs cptypes2 ieee r5rs])
-  (inexact? [sig [(number) -> (boolean)]] [flags pure mifoldable discard safeongoodargs cptypes2 ieee r5rs])
+  (exact? [sig [(number) -> (boolean)]] [flags pure mifoldable discard safeongoodargs ieee r5rs])
+  (inexact? [sig [(number) -> (boolean)]] [flags pure mifoldable discard safeongoodargs ieee r5rs])
   (inexact [sig [(number) -> (inexact-number)]] [flags arith-op mifoldable discard safeongoodargs])
   (exact [sig [(number) -> (exact-number)]] [flags arith-op mifoldable discard]) ; no safeongoodargs because it fails with +inf.0
   ((r6rs: <) [sig [(real real real ...) -> (boolean)]] [flags pure mifoldable discard safeongoodargs ieee r5rs cptypes2])         ; restricted to 2+ arguments
@@ -1627,7 +1627,7 @@
   (ratnum? [sig [(ptr) -> (boolean)]] [flags pure unrestricted mifoldable discard])
   (read-token [sig [() (textual-input-port) (textual-input-port sfd uint) -> (symbol ptr maybe-uint maybe-uint)]] [flags])
   (real-time [sig [() -> (uint)]] [flags unrestricted alloc])
-  (record? [sig [(ptr) (ptr rtd) -> (boolean)]] [flags pure mifoldable discard cp02 cptypes2])
+  (record? [sig [(ptr) (ptr rtd) -> (boolean)]] [flags pure mifoldable discard safeongoodargs cp02 cptypes2])
   (record-constructor [sig [(sub-ptr) -> (procedure)]] [flags cp02]) ; accepts rtd or rcd
   (record-constructor-descriptor? [sig [(ptr) -> (boolean)]] [flags pure unrestricted mifoldable discard cp02])
   (record-equal-procedure [sig [(record record) -> (maybe-procedure)]] [flags discard])

@@ -617,50 +617,6 @@ Notes:
          [else (if (not extend?) 'bottom '$record)])]
       [else (if (not extend?) 'bottom '$record)]))
 
-  ; Recognize predicates and get the corresponding
-  ; type using the notation in primdata.ss
-  ; TODO: Move this info to primdata.ss
-  (define (primref-name->predicate name)
-    (case name
-      [pair? 'pair]
-      [box? 'box]
-      [$record? '$record]
-      [fixnum? 'fixnum]
-      [bignum? 'bignum]
-      [ratnum? 'ratnum]
-      [flonum? 'flonum]
-      [exact? 'exact-number]
-      [inexact? 'inexact-number]
-      [real? 'real]
-      [number? 'number]
-      [vector? 'vector]
-      [string? 'string]
-      [bytevector? 'bytevector]
-      [fxvector? 'fxvector]
-      [flvector? 'flvector]
-      [gensym? 'gensym]
-      [uninterned-symbol? 'uninterned-symbol]
-      [symbol? 'symbol]
-      [char? 'char]
-      [boolean? 'boolean]
-      [procedure? 'procedure]
-      [not 'false]
-      [null? 'null]
-      [eof-object? 'eof-object]
-      [bwp-object? 'bwp-object]
-      [$immediate? '$immediate]
-      [list? 'list]
-      [list-assuming-immutable? 'list-assuming-immutable]
-      [record? 'record]
-      [record-type-descriptor? 'rtd]
-      [integer? 'integer]
-      [rational? 'rational]
-      [cflonum? 'cflonum]
-      [else #f])) ; this function is used only to detect predicates.
-
-  (define (primref->predicate pr extend?)
-    (primref-name/nqm->predicate (primref-name->predicate (primref-name pr)) extend?))
-
   (define check-constant-is?
     (case-lambda
       [(x)
@@ -711,6 +667,10 @@ Notes:
                   [else
                    (let ([rest ($sgetprop (primref-name pr) '*rest-type* #f)])
                      (primref-name/nqm->predicate rest extend?))]))]))))
+
+  (define (primref->predicate pr extend?)
+    (let ([type ($sgetprop (primref-name pr) '*pred-type* #f)])
+      (primref-name/nqm->predicate type extend?)))
 
   (define (primref->unsafe-primref pr)
     (lookup-primref 3 (primref-name pr)))

@@ -175,6 +175,7 @@
            number*-pred real*-pred ratnum-pred
            flonum-pred flinteger-pred flzero-pred
            exact*-pred inexact-pred
+           exact-complex-pred inexact-complex-pred
            char-pred
            symbol-pred interned-symbol-pred uninterned-symbol-pred gensym-pred)
 
@@ -236,6 +237,8 @@
     (define flzero-pred (make-pred-number* flzero-mask))
     (define exact*-pred (make-pred-number* exact*-pred-mask))
     (define inexact-pred (make-pred-number* inexact-pred-mask))
+    (define exact-complex-pred (make-pred-number* exact-complex-mask))
+    (define inexact-complex-pred (make-pred-number* inexact-complex-mask))
     (define char-pred (make-pred-number* char-mask))
     (define symbol-pred (make-pred-number* symbol-pred-mask))
     (define interned-symbol-pred (make-pred-number* interned-symbol-mask))
@@ -441,8 +444,10 @@
       [rational (cons 'exact-integer real-pred)]
       [integer integer-pred]
       [(uinteger sub-integer) (cons 'bottom integer-pred)]
-      [(cflonum inexact-number) inexact-pred]
+      [inexact-number inexact-pred]
       [exact-number exact-pred]
+      [$inexactnum inexact-complex-pred]
+      [$exactnum exact-complex-pred]
       [integer integer-pred]
       [flinteger flinteger-pred]
       [number number-pred]

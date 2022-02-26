@@ -311,9 +311,13 @@
                         (with-syntax ([(unprefixed . prim) (prim-name #'prim)])
                           (with-syntax ([((((in ...) (out ...)) ...) ...)
                                          (map ins-and-outs #'(((in ...) ...) ...) #'((out ...) ...))])
-                            #'(fuzz-prim-args 'prim 'unprefixed '(lib ...)
-                                '(shared-flag ... flag ...)
-                                '([(in ...) . (out ...)] ... ...))))])))
+                            #'(begin
+                               (fuzz-prim-args 'prim 'unprefixed '(lib ...)
+                                 '(shared-flag ... flag ...)
+                                 '([(in ...) . (out ...)] ... ...))
+                               (check-pred-args 'prim 'unprefixed '(lib ...)
+                                 '(shared-flag ... flag ...)
+                                 'p))))])))
                  #`(begin #,@(map do-entry #'(entry ...))))])))
         (define env
           (let ([env (copy-environment (scheme-environment) #t)])
@@ -675,6 +679,34 @@
                             (car bad**)))
                         (loop (cdr good*) (cdr bad**) (cons (car good*) rgood*)))))))
               (map car in*/out**))))
+        (define (check-pred-args name unprefixed-name lib* flag* p)
+          (define-syntax flags-set?  (syntax-rules () [(_ x ...) (and (memq 'x flag*) ...)]))
+          (when (and p (flags-set? unrestricted))
+            (let ([good.bad* (symbol-hashtable-ref type-table p #f)])
+              (when good.bad*
+                (let loop ([good.bad* good.bad*] [first #t])
+                  (unless (null? good.bad*)
+                    (let ([good.bad (car good.bad*)])
+                      (let ([call `(,name ',good.bad)])
+                        (printf "testing ~s\n" call)
+                        (flush-output-port)
+                        (let ([c (call/cc
+                                   (lambda (k)
+                                     (with-exception-handler
+                                       (lambda (c) (unless (warning? c) (k c)))
+                                       (lambda () (eval call env)))))])
+                          (if (and (violation? c)
+                                   (not (and (syntax-violation? c)
+                                             (message-condition? c)
+                                             (equal? (condition-message c) "invalid syntax")))
+                                   (not (and (irritants-condition? c)
+                                             ; split up so we can grep for "invalid memory reference" in mat output and not see this
+                                             (member (string-append "invalid" " " "memory reference") (condition-irritants c)))))
+                                (errorf 'check-pred-args "unexpected exception occurred evaluating ~s: ~a"
+                                        call (with-output-to-string (lambda () (display-condition c))))
+                                (unless (eq? c first)
+                                  (errorf 'check-pred-args "bad result occurred evaluating ~s | expected: ~s | got: ~s | again: ~s | is symbol: ~s" call first c (eval `(,name ',(car good.bad*)) env) (eval `(,'symbol? ',(car good.bad*)) env)))))))
+                    (loop (cdr good.bad*) #f)))))))
         (meta-cond
           [(file-exists? "../s/primdata.ss") (include "../s/primdata.ss")]
           [else (include "../../s/primdata.ss")])

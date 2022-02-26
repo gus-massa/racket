@@ -577,10 +577,10 @@
   (transcoder-error-handling-mode [sig [(transcoder) -> (symbol)]] [flags pure mifoldable discard true])
   (bytevector->string [sig [(bytevector transcoder) -> (string)]] [flags alloc])  ; leave off alloc if transcoders can be user-defined
   (string->bytevector [sig [(string transcoder) -> (bytevector)]] [flags alloc])  ; leave off alloc if transcoders can be user-defined
-  (port? [sig [(ptr) -> (boolean)]] [flags pure unrestricted mifoldable discard])
+  (port? [sig [(ptr) -> (boolean)]] [pred port] [flags pure unrestricted mifoldable discard])
   (port-transcoder [sig [(port) -> (ptr)]] [flags pure mifoldable discard])
-  (textual-port? [sig [(port) -> (boolean)]] [flags pure mifoldable discard])
-  (binary-port? [sig [(port) -> (boolean)]] [flags pure mifoldable discard])
+  (textual-port? [sig [(port) -> (boolean)]] [pred textual-port] [flags pure mifoldable discard])
+  (binary-port? [sig [(port) -> (boolean)]] [pred binary-port] [flags pure mifoldable discard])
   (transcoded-port [sig [(binary-port transcoder) -> (textual-port)]] [flags alloc])
   (port-has-port-position? [sig [(port) -> (boolean)]] [flags pure mifoldable discard])
   (port-position [sig [(port) -> (ptr)]] [flags])
@@ -1327,7 +1327,7 @@
   (file-length [sig [(sub-port) -> (uint)]] [flags])
   (file-modification-time [sig [(pathname) (pathname ptr) -> (time)]] [flags discard])
   (file-position [sig [(sub-port) -> (sub-ptr)] [(sub-port sub-ptr) -> (void)]] [flags])
-  (file-port? [sig [(port) -> (boolean)]] [flags pure mifoldable discard])
+  (file-port? [sig [(port) -> (boolean)]] [pred file-port] [flags pure mifoldable discard])
   (port-file-compressed! [sig [(port) -> (void)]] [flags])
   (file-regular? [sig [(pathname) (pathname ptr) -> (boolean)]] [flags discard])
   (file-symbolic-link? [sig [(pathname) -> (boolean)]] [flags discard])

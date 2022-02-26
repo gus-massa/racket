@@ -270,6 +270,7 @@
   (define maybe-bytevector-pred (make-pred-or false-rec 'bottom 'bytevector 'bottom 'bottom))
   (define eof/bytevector-pred (make-pred-or eof-rec 'bottom 'bytevector 'bottom 'bottom))
   (define maybe-pair-pred (make-pred-or false-rec 'bottom 'pair 'bottom 'bottom))
+  (define maybe-port-pred (make-pred-or false-rec 'bottom 'port 'bottom 'bottom))
   (define maybe-symbol/string-pred (make-pred-or false-rec symbol-pred 'string 'bottom 'bottom))
   (define maybe-$record-pred (make-pred-or false-rec 'bottom 'bottom 'bottom '$record))
   (define maybe-char-pred (make-pred-or false-rec char-pred 'bottom 'bottom 'bottom))
@@ -454,11 +455,19 @@
       [sub-number (cons 'bottom number-pred)]
       [maybe-number maybe-number-pred]
 
+      [port 'port]
+      [(textual-input-port textual-output-port textual-port
+        binary-input-port binary-output-port binary-port
+        input-port output-port file-port) '(bottom . port)]
+      [(sub-port) '(bottom . normalptr)]
+      [(maybe-textual-input-port maybe-textual-output-port
+        maybe-binary-input-port maybe-binary-output-port) (cons false-rec maybe-port-pred)]
+
       [$record '$record]
       [(record rtd) '(bottom . $record)] ; not sealed
       [(maybe-rtd) (cons false-rec maybe-$record-pred)]
-      [(transcoder textual-input-port textual-output-port binary-input-port binary-output-port) '(bottom . $record)]  ; opaque
-      [(maybe-transcoder maybe-textual-input-port maybe-textual-output-port maybe-binary-input-port maybe-binary-output-port input-port output-port) (cons false-rec maybe-$record-pred)]
+      [(transcoder) '(bottom . $record)]  ; opaque, sealed
+      [(maybe-transcoder) (cons false-rec maybe-$record-pred)]
       [(rcd sfd timeout) '(bottom . $record)] ; not opaque, sealed
       [(maybe-rcd maybe-sub-rcd maybe-sfd maybe-timeout) (cons false-rec maybe-$record-pred)]
 

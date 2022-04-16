@@ -41,6 +41,9 @@
      (let ([val (unwrap val)])
        (number? val))]))
 
+(define (eqv-implies-eq? e)
+  (equal-implies-eq? e))
+
 ;; e1 and e2 have been simplified;
 ;; return #t only if e2 doesn't try to
 ;; consult continuation marks

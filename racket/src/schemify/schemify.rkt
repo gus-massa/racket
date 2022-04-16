@@ -791,6 +791,19 @@
                                     (list exp1 exp2)
                                     #f target
                                     prim-knowns knowns imports mutated simples unsafe-mode?)]))]
+           [`(eqv? ,exp1 ,exp2)
+            (let ([exp1 (schemify exp1 'fresh)]
+                  [exp2 (schemify exp2 'fresh)])
+              (cond
+                [(eq? exp1 exp2)
+                 #t]
+                [(or (eqv-implies-eq? exp1) (equal-implies-eq? exp2))
+                 `(eq? ,exp1 ,exp2)]
+                [else
+                 (left-to-right/app 'eqv?
+                                    (list exp1 exp2)
+                                    #f target
+                                    prim-knowns knowns imports mutated simples unsafe-mode?)]))]
            [`(call-with-values ,generator ,receiver)
             (cond
               [(and (lambda? generator)

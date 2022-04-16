@@ -408,11 +408,9 @@
   
 (test-comp '(lambda (x) (eq? 7 x))
            '(lambda (x) (equal? 7 x)))
-(test-comp #:except 'chez-scheme ; `eqv?` conversion happens in cpnanopass
-           '(lambda (x) (eq? x 7))
+(test-comp '(lambda (x) (eq? x 7))
            '(lambda (x) (eqv? x 7)))
-(test-comp #:except 'chez-scheme ; `eqv?` conversion happens in cpnanopass
-           '(lambda (x) (eq? 7 x))
+(test-comp '(lambda (x) (eq? 7 x))
            '(lambda (x) (eqv? 7 x)))
 
 ; car is a primitive, map is required from another module

@@ -488,8 +488,7 @@
                     `(lambda (x y) (boolean? (,e? x y)))
                     `(lambda (x y) (,e? x y) #t)))])
   (test-equal? 'eq?)
-  (unless (eq? 'chez-scheme (system-type 'vm))
-    (test-equal? 'eqv?))
+  (test-equal? 'eqv?)
   (test-equal? 'equal?))
 
 (test-comp '(let ([x 3]) x)

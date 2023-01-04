@@ -583,7 +583,7 @@ Notes:
       [(pair? d) 'pair]
       [(box? d) 'box]
       [(vector? d) 'vector]
-      [(string? d) 'string]
+      [(string? d) string*-pred]
       [(bytevector? d) 'bytevector]
       [(fxvector? d) 'fxvector]
       [(flvector? d) 'flvector]

@@ -1426,11 +1426,17 @@
   (not (cptypes-equivalent-expansion?
          '(lambda (x) (fixnum? (bitwise-and x -7)))
          '(lambda (x) (bitwise-and x -7) #t)))
+  (not (cptypes-equivalent-expansion?
+         '(lambda (x) (fixnum? (bitwise-and x (+ (most-positive-fixnum) 1))))
+         '(lambda (x) (bitwise-and x -7) #t)))
   (cptypes-equivalent-expansion?
     '(lambda (x) (fixnum? (bitwise-ior x -7)))
     '(lambda (x) (bitwise-ior x -7) #t))
   (not (cptypes-equivalent-expansion?
          '(lambda (x) (fixnum? (bitwise-ior x 7)))
+         '(lambda (x) (bitwise-ior x 7) #t)))
+  (not (cptypes-equivalent-expansion?
+         '(lambda (x) (fixnum? (bitwise-ior x (- (most-negative-fixnum) 1))))
          '(lambda (x) (bitwise-ior x 7) #t)))
   (cptypes-equivalent-expansion?
     '(lambda (f x) (when (fixnum? x) (bitwise-and (f) x)))

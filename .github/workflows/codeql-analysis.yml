@@ -3,7 +3,6 @@ name: "LGTM Code Scanning"
 on:
   push:
     branches:
-      - master
   pull_request:
 
 permissions:

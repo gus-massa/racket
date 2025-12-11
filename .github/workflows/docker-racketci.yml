@@ -3,7 +3,6 @@ name: Build RacketCI Docker Image
 on:
   push:
     branches:
-      - master
     paths:
       - '.github/images/Dockerfile'
       - '.github/workflows/docker-racketci.yml'

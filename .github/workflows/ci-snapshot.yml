@@ -3,7 +3,6 @@ name: Snapshot Generation
 on:
   push:
     branches:
-      - master
 
 # Only run at most one snapshot action
 #   https://docs.github.com/en/enterprise-cloud@latest/actions/using-jobs/using-concurrency

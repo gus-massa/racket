@@ -3,7 +3,6 @@ name: CI Linux x86
 on:
   push:
     branches:
-      - master
 
 jobs:
 

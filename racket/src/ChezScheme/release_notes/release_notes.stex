@@ -116,6 +116,10 @@ Online versions of both books can be found at
 %-----------------------------------------------------------------------------
 \section{Functionality Changes}\label{section:functionality}
 
+\subsection{Type recovery improvements (10.5.0???)}
+
+The type recovery pass has partial support for \scheme{quotient}. [WIP]
+
 \subsection{Interrupts and Large-Vector Operations (10.4.0)}
 
 Vector and string operations such as \scheme{make-vector},
